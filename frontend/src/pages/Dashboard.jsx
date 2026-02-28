@@ -85,9 +85,18 @@ export default function Dashboard() {
                     <h1 className="text-gradient" style={{ fontSize: '1.8rem', margin: 0 }}>AtmoInsight Control Center</h1>
                     <p style={{ color: 'var(--text-muted)', margin: '0.2rem 0 0' }}>Real-time Environmental Monitoring</p>
                 </div>
-                <button className="btn-primary" onClick={() => { logout(); navigate('/'); }} style={{ background: 'transparent', border: '1px solid rgba(255,255,255,0.2)', boxShadow: 'none' }}>
-                    Sign Out
-                </button>
+                <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
+                    <button
+                        className="btn-primary"
+                        onClick={() => navigate('/sql-explorer')}
+                        style={{ background: 'linear-gradient(135deg, rgba(139,92,246,0.3), rgba(6,182,212,0.3))', border: '1px solid rgba(139,92,246,0.5)', display: 'flex', alignItems: 'center', gap: '0.4rem' }}
+                    >
+                        🛢️ SQL Explorer
+                    </button>
+                    <button className="btn-primary" onClick={() => { logout(); navigate('/'); }} style={{ background: 'transparent', border: '1px solid rgba(255,255,255,0.2)', boxShadow: 'none' }}>
+                        Sign Out
+                    </button>
+                </div>
             </div>
 
             {/* Live Meteorological Data Widget (Open-Meteo) */}

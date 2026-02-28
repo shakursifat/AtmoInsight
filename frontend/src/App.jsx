@@ -3,6 +3,7 @@ import { AuthProvider, AuthContext } from './context/AuthContext';
 import { useContext } from 'react';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
+import SQLExplorer from './pages/SQLExplorer';
 
 const PrivateRoute = ({ children }) => {
   const { user } = useContext(AuthContext);
@@ -18,6 +19,14 @@ function AppRoutes() {
         element={
           <PrivateRoute>
             <Dashboard />
+          </PrivateRoute>
+        }
+      />
+      <Route
+        path="/sql-explorer"
+        element={
+          <PrivateRoute>
+            <SQLExplorer />
           </PrivateRoute>
         }
       />
