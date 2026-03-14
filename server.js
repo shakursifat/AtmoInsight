@@ -14,7 +14,8 @@ const disastersRoutes = require('./src/routes/disasters');
 const analyticsRoutes = require('./src/routes/analytics');
 const reportsRoutes = require('./src/routes/reports');
 const mapRoutes = require('./src/routes/map');
-const sqlExplorerRoutes = require('./src/routes/sqlExplorer');
+const sensorsRoutes = require('./src/routes/sensors');
+const lookupRoutes = require('./src/routes/lookup');
 
 const app = express();
 const server = http.createServer(app);
@@ -44,7 +45,8 @@ app.use('/api/disasters', disastersRoutes);
 app.use('/api/analytics', analyticsRoutes);
 app.use('/api/reports', reportsRoutes);
 app.use('/api/map', mapRoutes);
-app.use('/api/sql', sqlExplorerRoutes);
+app.use('/api/sensors', sensorsRoutes);
+app.use('/api/lookup', lookupRoutes);
 
 // Basic root route so you don't get "Cannot GET /"
 app.get('/', (req, res) => {

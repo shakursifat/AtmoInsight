@@ -3,7 +3,10 @@ import { AuthProvider, AuthContext } from './context/AuthContext';
 import { useContext } from 'react';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
-import SQLExplorer from './pages/SQLExplorer';
+import SensorPage from './pages/SensorPage';
+import ReadingPage from './pages/ReadingPage';
+import MainTab from './pages/MainTab';
+
 
 const PrivateRoute = ({ children }) => {
   const { user } = useContext(AuthContext);
@@ -23,14 +26,31 @@ function AppRoutes() {
         }
       />
       <Route
-        path="/sql-explorer"
+        path="/sensors"
         element={
           <PrivateRoute>
-            <SQLExplorer />
+            <SensorPage />
+          </PrivateRoute>
+        }
+      />
+      <Route
+        path="/readings"
+        element={
+          <PrivateRoute>
+            <ReadingPage />
+          </PrivateRoute>
+        }
+      />
+      <Route
+        path="/main"
+        element={
+          <PrivateRoute>
+            <MainTab />
           </PrivateRoute>
         }
       />
     </Routes>
+
   );
 }
 

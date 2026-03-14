@@ -2,12 +2,52 @@ const pool = require('../db/pool');
 
 const getAllReadings = async (req, res) => {
     try {
-        const limit = parseInt(req.query.limit) || 100;
-        // Matches the actual public.reading table schema structure
-        const result = await pool.query(
-            'SELECT * FROM reading ORDER BY timestamp DESC LIMIT $1',
-            [limit]
-        );
+        const { sensor_id, measurement_type_id, unit_id, start, end, limit } = req.query;
+        const maxLimit = parseInt(limit) || 200;
+
+        let query = `
+            SELECT 
+                r.reading_id,
+                r.sensor_id,
+                r.timestamp,
+                r.value,
+                r.measurement_type_id,
+                r.unit_id,
+                mt.type_name AS measurement_type_name,
+                mu.unit_name,
+                mu.symbol AS unit_symbol
+            FROM reading r
+            LEFT JOIN measurementtype mt ON r.measurement_type_id = mt.measurement_type_id
+            LEFT JOIN measurementunit mu ON r.unit_id = mu.unit_id
+            WHERE 1=1
+        `;
+        const params = [];
+
+        if (sensor_id) {
+            params.push(sensor_id);
+            query += ` AND r.sensor_id = $${params.length}`;
+        }
+        if (measurement_type_id) {
+            params.push(measurement_type_id);
+            query += ` AND r.measurement_type_id = $${params.length}`;
+        }
+        if (unit_id) {
+            params.push(unit_id);
+            query += ` AND r.unit_id = $${params.length}`;
+        }
+        if (start) {
+            params.push(start);
+            query += ` AND r.timestamp >= $${params.length}`;
+        }
+        if (end) {
+            params.push(end);
+            query += ` AND r.timestamp <= $${params.length}`;
+        }
+
+        params.push(maxLimit);
+        query += ` ORDER BY r.timestamp DESC LIMIT $${params.length}`;
+
+        const result = await pool.query(query, params);
         res.json(result.rows);
     } catch (error) {
         res.status(500).json({ error: error.message });
@@ -36,7 +76,28 @@ const createReading = async (req, res) => {
     }
 };
 
+const getWeeklyTrend = async (req, res) => {
+    try {
+        const result = await pool.query(`
+            SELECT
+                DATE(r.timestamp) AS day,
+                r.measurement_type_id,
+                mt.type_name,
+                ROUND(AVG(r.value)::numeric, 2) AS avg_value
+            FROM reading r
+            LEFT JOIN measurementtype mt ON r.measurement_type_id = mt.measurement_type_id
+            WHERE r.timestamp >= NOW() - INTERVAL '7 days'
+            GROUP BY DATE(r.timestamp), r.measurement_type_id, mt.type_name
+            ORDER BY day ASC, r.measurement_type_id
+        `);
+        res.json(result.rows);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+};
+
 module.exports = {
     getAllReadings,
-    createReading
+    createReading,
+    getWeeklyTrend
 };

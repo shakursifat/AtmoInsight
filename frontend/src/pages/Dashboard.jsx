@@ -88,10 +88,17 @@ export default function Dashboard() {
                 <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
                     <button
                         className="btn-primary"
-                        onClick={() => navigate('/sql-explorer')}
-                        style={{ background: 'linear-gradient(135deg, rgba(139,92,246,0.3), rgba(6,182,212,0.3))', border: '1px solid rgba(139,92,246,0.5)', display: 'flex', alignItems: 'center', gap: '0.4rem' }}
+                        onClick={() => navigate('/main')}
+                        style={{ background: 'linear-gradient(135deg, rgba(249,115,22,0.3), rgba(139,92,246,0.3))', border: '1px solid rgba(249,115,22,0.5)', display: 'flex', alignItems: 'center', gap: '0.4rem' }}
                     >
-                        🛢️ SQL Explorer
+                        🌤️ Weather Dashboard
+                    </button>
+                    <button
+                        className="btn-primary"
+                        onClick={() => navigate('/sensors')}
+                        style={{ background: 'linear-gradient(135deg, rgba(6,182,212,0.3), rgba(16,185,129,0.3))', border: '1px solid rgba(6,182,212,0.5)', display: 'flex', alignItems: 'center', gap: '0.4rem' }}
+                    >
+                        🌡️ Sensor Explorer
                     </button>
                     <button className="btn-primary" onClick={() => { logout(); navigate('/'); }} style={{ background: 'transparent', border: '1px solid rgba(255,255,255,0.2)', boxShadow: 'none' }}>
                         Sign Out
