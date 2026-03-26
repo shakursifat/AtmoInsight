@@ -10,21 +10,25 @@ export default function Login() {
     const [username, setUsername] = useState('');
     const [role, setRole] = useState('Citizen'); // Default role
     const [error, setError] = useState('');
+    const [successMsg, setSuccessMsg] = useState('');
     const { login } = useContext(AuthContext);
     const navigate = useNavigate();
 
     const handleSubmit = async (e) => {
         if (e) e.preventDefault();
         setError('');
+        setSuccessMsg('');
 
         if (isRegister) {
             try {
                 await axios.post('http://localhost:5000/api/auth/register', {
                     username, email, password, role
                 });
-                // Auto login after register
-                const success = await login(email, password);
-                if (success) navigate('/dashboard');
+                // Registration succeeded — show success and switch to login form
+                setSuccessMsg('Registration successful! Please log in with your new credentials.');
+                setIsRegister(false);
+                setUsername('');
+                setPassword('');
             } catch (err) {
                 setError(err.response?.data?.error || 'Registration failed');
             }
@@ -54,6 +58,12 @@ export default function Login() {
                 <p style={{ color: 'var(--text-muted)', marginBottom: '2rem' }}>
                     {isRegister ? 'Join the network' : 'Sign in to your dashboard'}
                 </p>
+
+                {successMsg && (
+                    <div style={{ background: 'rgba(34, 197, 94, 0.1)', color: '#22c55e', padding: '0.75rem', borderRadius: '8px', marginBottom: '1.5rem', border: '1px solid rgba(34, 197, 94, 0.3)' }}>
+                        {successMsg}
+                    </div>
+                )}
 
                 {error && (
                     <div style={{ background: 'rgba(239, 68, 68, 0.1)', color: 'var(--danger)', padding: '0.75rem', borderRadius: '8px', marginBottom: '1.5rem', border: '1px solid rgba(239, 68, 68, 0.3)' }}>
@@ -109,7 +119,7 @@ export default function Login() {
                     {isRegister ? 'Already have an account? ' : "Don't have an account? "}
                     <span
                         style={{ color: 'var(--accent-cyan)', cursor: 'pointer', fontWeight: 'bold' }}
-                        onClick={() => setIsRegister(!isRegister)}
+                        onClick={() => { setIsRegister(!isRegister); setError(''); setSuccessMsg(''); }}
                     >
                         {isRegister ? 'Login here' : 'Register Now'}
                     </span>
