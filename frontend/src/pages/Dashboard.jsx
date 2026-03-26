@@ -80,7 +80,7 @@ export default function Dashboard() {
         <div className="animate-fade-in" style={{ padding: '2rem', maxWidth: '1200px', margin: '0 auto' }}>
 
             {/* Header Widget */}
-            <div className="glass-panel" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1.5rem 2rem', marginBottom: '2rem' }}>
+            <div className="glass-panel" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '3rem', padding: '1.5rem 2rem', marginBottom: '3.5rem' }}>
                 <div>
                     <h1 className="text-gradient" style={{ fontSize: '1.8rem', margin: 0 }}>AtmoInsight Control Center</h1>
                     <p style={{ color: 'var(--text-muted)', margin: '0.2rem 0 0' }}>Real-time Environmental Monitoring</p>
@@ -89,18 +89,18 @@ export default function Dashboard() {
                     <button
                         className="btn-primary"
                         onClick={() => navigate('/main')}
-                        style={{ background: 'linear-gradient(135deg, rgba(249,115,22,0.3), rgba(139,92,246,0.3))', border: '1px solid rgba(249,115,22,0.5)', display: 'flex', alignItems: 'center', gap: '0.4rem' }}
+                        style={{ background: '#d97706', border: '1px solid #b45309', display: 'flex', alignItems: 'center', gap: '0.4rem', color: '#fff' }}
                     >
                         🌤️ Weather Dashboard
                     </button>
                     <button
                         className="btn-primary"
                         onClick={() => navigate('/sensors')}
-                        style={{ background: 'linear-gradient(135deg, rgba(6,182,212,0.3), rgba(16,185,129,0.3))', border: '1px solid rgba(6,182,212,0.5)', display: 'flex', alignItems: 'center', gap: '0.4rem' }}
+                        style={{ background: '#0891b2', border: '1px solid #0e7490', display: 'flex', alignItems: 'center', gap: '0.4rem', color: '#fff' }}
                     >
                         🌡️ Sensor Explorer
                     </button>
-                    <button className="btn-primary" onClick={() => { logout(); navigate('/'); }} style={{ background: 'transparent', border: '1px solid rgba(255,255,255,0.2)', boxShadow: 'none' }}>
+                    <button className="btn-primary" onClick={() => { logout(); navigate('/'); }} style={{ background: '#374151', border: '1px solid #4b5563', color: '#e5e7eb', boxShadow: 'none' }}>
                         Sign Out
                     </button>
                 </div>
