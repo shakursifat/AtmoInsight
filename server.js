@@ -5,6 +5,7 @@ const cors = require('cors');
 const { Server } = require('socket.io');
 const cron = require('node-cron');
 const pool = require('./src/db/pool');
+const { fetchAndStoreWeatherData } = require('./src/services/openMeteoService');
 
 // Route imports
 const authRoutes = require('./src/routes/auth');
@@ -16,7 +17,7 @@ const reportsRoutes = require('./src/routes/reports');
 const mapRoutes = require('./src/routes/map');
 const sensorsRoutes = require('./src/routes/sensors');
 const lookupRoutes = require('./src/routes/lookup');
-
+const currentConditionsRoutes = require('./src/routes/currentConditions');
 const app = express();
 const server = http.createServer(app);
 
@@ -47,6 +48,7 @@ app.use('/api/reports', reportsRoutes);
 app.use('/api/map', mapRoutes);
 app.use('/api/sensors', sensorsRoutes);
 app.use('/api/lookup', lookupRoutes);
+app.use('/api/current-conditions', currentConditionsRoutes);
 
 // Basic root route so you don't get "Cannot GET /"
 app.get('/', (req, res) => {
@@ -149,6 +151,12 @@ cron.schedule('*/5 * * * *', async () => {
     } catch (error) {
         console.error('Error in cron job simulation:', error.message);
     }
+});
+
+// node-cron job: Fetch Open-Meteo weather every 30 minutes
+cron.schedule('*/30 * * * *', async () => {
+    console.log('Running cron job: Fetching Open-Meteo weather data...');
+    await fetchAndStoreWeatherData();
 });
 
 const PORT = process.env.PORT || 5000;
