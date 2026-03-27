@@ -8,6 +8,7 @@ const pool = require('./src/db/pool');
 const { fetchAndStoreWeatherData } = require('./src/services/openMeteoService');
 const { fetchAndStoreOpenAQData } = require('./src/services/openAQService');
 const { fetchAndStoreCurrentConditions } = require('./src/services/openWeatherMapService');
+const { fetchAndStoreIQAirData } = require('./src/services/iqairService');
 
 // Route imports
 const authRoutes = require('./src/routes/auth');
@@ -158,22 +159,25 @@ pool.connect().then(client => {
 async function runAllDataFetches(source) {
     console.log(`\n[Cron] Starting scheduled sync (source: ${source})...`);
     try {
-        const [meteoResult, owmResult, aqResult] = await Promise.allSettled([
+        const [meteoResult, owmResult, aqResult, iqairResult] = await Promise.allSettled([
             fetchAndStoreWeatherData(),
             fetchAndStoreCurrentConditions(),
             fetchAndStoreOpenAQData(),
+            fetchAndStoreIQAirData(),
         ]);
 
         const summary = {
-            open_meteo: meteoResult.status === 'fulfilled' ? meteoResult.value : { status: 'error' },
-            open_weather_map: owmResult.status === 'fulfilled' ? owmResult.value : { status: 'error' },
-            openaq: aqResult.status === 'fulfilled' ? aqResult.value : { status: 'error' },
+            open_meteo:      meteoResult.status  === 'fulfilled' ? meteoResult.value  : { status: 'error' },
+            open_weather_map: owmResult.status   === 'fulfilled' ? owmResult.value    : { status: 'error' },
+            openaq:          aqResult.status     === 'fulfilled' ? aqResult.value     : { status: 'error' },
+            iqair:           iqairResult.status  === 'fulfilled' ? iqairResult.value  : { status: 'error' },
         };
 
         const totalInserted =
-            (summary.open_meteo.count || 0) +
+            (summary.open_meteo.count      || 0) +
             (summary.open_weather_map.count || 0) +
-            (summary.openaq.count || 0);
+            (summary.openaq.count          || 0) +
+            (summary.iqair.count           || 0);
 
         console.log(`[Cron] Sync complete. Total new readings: ${totalInserted}`);
 
@@ -219,5 +223,6 @@ server.listen(PORT, () => {
     console.log(`\n✅  AtmoInsight Server running on port ${PORT}`);
     console.log(`   Open-Meteo sync:       every 30 min (free, no key needed)`);
     console.log(`   OpenWeatherMap sync:   every 30 min (${process.env.OPENWEATHERMAP_API_KEY ? '✅ key found' : '⚠️  key missing — add OPENWEATHERMAP_API_KEY to .env'})`);
-    console.log(`   OpenAQ sync:           every 60 min (${process.env.OPENAQ_API_KEY ? '✅ key found' : '⚠️  key missing — add OPENAQ_API_KEY to .env'})\n`);
+    console.log(`   OpenAQ sync:           every 60 min (${process.env.OPENAQ_API_KEY        ? '✅ key found' : '⚠️  key missing — add OPENAQ_API_KEY to .env'})`);
+    console.log(`   IQAir sync:            every 30 min (${process.env.IQAIR_API_KEY          ? '✅ key found' : '⚠️  key missing — add IQAIR_API_KEY to .env'})\n`);
 });
