@@ -7,9 +7,11 @@ import SensorPage from './pages/SensorPage';
 import ReadingPage from './pages/ReadingPage';
 import MainTab from './pages/MainTab';
 
-
 const PrivateRoute = ({ children }) => {
-  const { user } = useContext(AuthContext);
+  const { user, loading } = useContext(AuthContext);
+
+  if (loading) return <div>Loading...</div>;
+
   return user ? children : <Navigate to="/" />;
 };
 
@@ -50,7 +52,6 @@ function AppRoutes() {
         }
       />
     </Routes>
-
   );
 }
 
