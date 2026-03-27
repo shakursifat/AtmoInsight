@@ -77,7 +77,7 @@ export default function Dashboard() {
     }
 
     return (
-        <div className="animate-fade-in" style={{ padding: '2rem', maxWidth: '1200px', margin: '0 auto' }}>
+        <div className="animate-fade-in" style={{ padding: '2rem', width: '100%', maxWidth: '100%', margin: '0 auto', boxSizing: 'border-box' }}>
 
             {/* Header Widget */}
             <div className="glass-panel" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '3rem', padding: '1.5rem 2rem', marginBottom: '3.5rem' }}>

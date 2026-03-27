@@ -432,7 +432,7 @@ export default function MainDashboard() {
         }
 
         .md-page    { min-height: 100vh; background: var(--bg-dark); display: flex; flex-direction: column; }
-        .md-content { flex: 1; max-width: 1240px; width: 100%; margin: 0 auto; padding: 2rem 1.5rem 3rem; animation: md-fade-up 0.5s ease both; }
+        .md-content { flex: 1; max-width: 95%; width: 100%; margin: 0 auto; padding: 2rem 1.5rem 3rem; animation: md-fade-up 0.5s ease both; }
 
         /* ── Navbar ── */
         .md-navbar {
