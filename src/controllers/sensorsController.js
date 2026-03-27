@@ -13,7 +13,13 @@ const getSensors = async (req, res) => {
                 s.status,
                 s.installed_at,
                 s.sensor_type_id,
-                s.location_id
+                s.location_id,
+                ST_Y(l.coordinates::geometry) as lat,
+                ST_X(l.coordinates::geometry) as lng,
+                (SELECT value FROM reading r WHERE r.sensor_id = s.sensor_id AND r.measurement_type_id = 1 ORDER BY timestamp DESC LIMIT 1) as latest_pm25,
+                (SELECT value FROM reading r WHERE r.sensor_id = s.sensor_id AND r.measurement_type_id = 3 ORDER BY timestamp DESC LIMIT 1) as latest_temp,
+                (SELECT value FROM reading r WHERE r.sensor_id = s.sensor_id AND r.measurement_type_id = 4 ORDER BY timestamp DESC LIMIT 1) as latest_humidity,
+                (SELECT timestamp FROM reading r WHERE r.sensor_id = s.sensor_id ORDER BY timestamp DESC LIMIT 1) as last_reading_timestamp
             FROM sensor s
             LEFT JOIN sensortype st ON s.sensor_type_id = st.sensor_type_id
             LEFT JOIN location l ON s.location_id = l.location_id

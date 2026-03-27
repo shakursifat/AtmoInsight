@@ -14,18 +14,9 @@ import {
   Filler,
 } from 'chart.js';
 import { Line } from 'react-chartjs-2';
-import { MapContainer, TileLayer, Marker, Popup, Circle } from 'react-leaflet';
-import 'leaflet/dist/leaflet.css';
-import L from 'leaflet';
+import InteractiveMap from '../components/InteractiveMap';
 
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend, Filler);
-
-// Fix Leaflet icon path issues in Vite/webpack builds
-import iconRetinaUrl from 'leaflet/dist/images/marker-icon-2x.png';
-import iconUrl from 'leaflet/dist/images/marker-icon.png';
-import shadowUrl from 'leaflet/dist/images/marker-shadow.png';
-const DefaultIcon = L.icon({ iconRetinaUrl, iconUrl, shadowUrl, iconSize: [25, 41], iconAnchor: [12, 41] });
-L.Marker.prototype.options.icon = DefaultIcon;
 
 const API = 'http://localhost:5000';
 
@@ -442,91 +433,8 @@ export default function MainTab() {
         {/* ═══════════════════════════════════════════════════════
             SECTION 5 — Interactive Radar Map
         ════════════════════════════════════════════════════════ */}
-        <div className="mt-card" style={{ padding: 0, overflow: 'hidden' }}>
-          {/* Header bar above map */}
-          <div style={{ padding: '1.2rem 1.6rem', borderBottom: '1px solid rgba(255,255,255,0.07)', display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-            <span style={{ fontSize: '1.2rem' }}>🗺️</span>
-            <h2 style={{ fontSize: '1.1rem', fontWeight: 700, margin: 0 }}>Sensor Radar Map</h2>
-            <span style={{ marginLeft: 'auto', fontSize: '0.72rem', padding: '2px 8px', borderRadius: 4, background: 'rgba(16,185,129,0.12)', color: '#34d399', border: '1px solid rgba(16,185,129,0.2)', fontWeight: 600 }}>
-              {mapSensors.length} Active Sensors
-            </span>
-            <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Click markers for latest reading</span>
-          </div>
-
-          {mapSensors.length === 0 ? (
-            <div style={{ height: 400, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)' }}>
-              No sensors with GPS coordinates found.
-            </div>
-          ) : (
-            <div style={{ height: 480, width: '100%' }}>
-              <MapContainer center={mapCenter} zoom={7} style={{ height: '100%', width: '100%' }}>
-                {/* Dark radar-style tile layer (CartoDB Dark Matter) */}
-                <TileLayer
-                  url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
-                  attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/">CARTO</a>'
-                />
-
-                {mapSensors.map((sensor) => {
-                  const val = parseFloat(sensor.latest_value);
-                  const isHigh = val > 80;
-                  // Radar pulse: circle radius scales with sensor reading value
-                  const pulseRadius = isNaN(val) ? 5000 : Math.max(3000, Math.min(val * 400, 25000));
-                  const pulseColor  = isHigh ? '#ef4444' : '#06b6d4';
-
-                  return (
-                    <span key={sensor.sensor_id}>
-                      {/* Radar "precipitation" overlay circle */}
-                      <Circle
-                        center={[sensor.lat, sensor.lng]}
-                        radius={pulseRadius}
-                        pathOptions={{
-                          color: pulseColor,
-                          fillColor: pulseColor,
-                          fillOpacity: 0.06,
-                          weight: 1.2,
-                          opacity: 0.3,
-                        }}
-                      />
-                      {/* Smaller inner glow circle */}
-                      <Circle
-                        center={[sensor.lat, sensor.lng]}
-                        radius={pulseRadius * 0.4}
-                        pathOptions={{
-                          color: pulseColor,
-                          fillColor: pulseColor,
-                          fillOpacity: 0.12,
-                          weight: 0,
-                          opacity: 0,
-                        }}
-                      />
-                      {/* Sensor marker */}
-                      <Marker position={[sensor.lat, sensor.lng]}>
-                        <Popup>
-                          <div style={{ minWidth: 180 }}>
-                            <div style={{ fontWeight: 700, fontSize: '0.95rem', color: '#0f172a', borderBottom: '1px solid #e2e8f0', paddingBottom: 4, marginBottom: 6 }}>
-                              📡 {sensor.sensor_name || `Sensor #${sensor.sensor_id}`}
-                            </div>
-                            <div style={{ fontSize: '0.85rem', color: '#475569', marginBottom: 4 }}>
-                              📍 {sensor.location_name || '—'}
-                            </div>
-                            <div style={{ fontSize: '1.3rem', fontWeight: 800, color: isHigh ? '#ef4444' : '#10b981' }}>
-                              {isNaN(val) ? '—' : val.toFixed(2)}
-                            </div>
-                            <div style={{ fontSize: '0.75rem', color: '#64748b' }}>Latest reading</div>
-                            {isHigh && (
-                              <div style={{ marginTop: 6, fontSize: '0.78rem', color: '#ef4444', fontWeight: 600 }}>
-                                ⚠️ Above threshold (80)
-                              </div>
-                            )}
-                          </div>
-                        </Popup>
-                      </Marker>
-                    </span>
-                  );
-                })}
-              </MapContainer>
-            </div>
-          )}
+        <div style={{ marginBottom: '2.5rem' }}>
+          <InteractiveMap />
         </div>
 
         {/* Footer note */}
