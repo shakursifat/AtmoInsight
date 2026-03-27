@@ -34,7 +34,7 @@ export default function Login() {
             }
         } else {
             const success = await login(email, password);
-            if (success) navigate('/dashboard');
+            if (success) navigate('/main-dashboard');
             else setError('Invalid credentials');
         }
     };
@@ -45,7 +45,7 @@ export default function Login() {
         setPassword(demoPassword);
         setError('');
         const success = await login(demoEmail, demoPassword);
-        if (success) navigate('/dashboard');
+        if (success) navigate('/main-dashboard');
         else setError('Demo credentials failed. Did you register them?');
     };
 

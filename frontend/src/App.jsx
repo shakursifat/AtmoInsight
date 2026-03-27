@@ -2,7 +2,7 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import { AuthProvider, AuthContext } from './context/AuthContext';
 import { useContext } from 'react';
 import Login from './pages/Login';
-import Dashboard from './pages/Dashboard';
+import MainDashboard from './pages/MainDashboard';
 import SensorPage from './pages/SensorPage';
 import ReadingPage from './pages/ReadingPage';
 import MainTab from './pages/MainTab';
@@ -19,14 +19,25 @@ function AppRoutes() {
   return (
     <Routes>
       <Route path="/" element={<Login />} />
+
+      {/* /dashboard and /main-dashboard both serve the new MainDashboard for all roles */}
       <Route
         path="/dashboard"
         element={
           <PrivateRoute>
-            <Dashboard />
+            <MainDashboard />
           </PrivateRoute>
         }
       />
+      <Route
+        path="/main-dashboard"
+        element={
+          <PrivateRoute>
+            <MainDashboard />
+          </PrivateRoute>
+        }
+      />
+
       <Route
         path="/sensors"
         element={
