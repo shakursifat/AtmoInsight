@@ -1,22 +1,34 @@
 const express = require('express');
 const router = express.Router();
-const { fetchCurrentConditionsByLocation } = require('../services/openWeatherService');
-const { verifyToken } = require('../middleware/authMiddleware');
+const pool = require('../db/pool');
 
-// GET /api/current-conditions?location_id=XX
-// Returns dashboard format specifically crafted for AtmoInsight location
-router.get('/', verifyToken, async (req, res) => {
-    const locationId = req.query.location_id;
-    if (!locationId) {
-        return res.status(400).json({ status: 'error', message: 'Query parameter location_id is required' });
-    }
-
+// GET /api/current-conditions
+// Returns the latest reading for each unique measurement type across all active sensors.
+// Uses LEFT JOIN so readings stored without a unit_id still appear.
+router.get('/', async (req, res) => {
     try {
-        const result = await fetchCurrentConditionsByLocation(locationId);
-        res.status(200).json(result);
-    } catch (error) {
-        console.error('API Error fetching current conditions:', error);
-        res.status(500).json({ status: 'error', message: error.message || 'Internal Server Error' });
+        const query = `
+SELECT DISTINCT ON (mt.type_name)
+  mt.type_name                              AS measurement,
+  ROUND(r.value::numeric, 2)               AS value,
+  COALESCE(mu.symbol, '')                  AS unit,
+  s.name                                   AS sensor_name,
+  l.name                                   AS location_name,
+  l.region,
+  r.timestamp
+FROM reading r
+JOIN sensor s            ON r.sensor_id         = s.sensor_id
+JOIN location l          ON s.location_id       = l.location_id
+JOIN measurementtype mt  ON r.measurement_type_id = mt.measurement_type_id
+LEFT JOIN measurementunit mu ON r.unit_id       = mu.unit_id
+WHERE s.status = 'Active'
+ORDER BY mt.type_name, r.timestamp DESC;
+        `;
+        const result = await pool.query(query);
+        res.json({ conditions: result.rows });
+    } catch (err) {
+        console.error('[currentConditions]', err);
+        res.status(500).json({ error: 'Internal server error' });
     }
 });
 
