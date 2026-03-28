@@ -39,7 +39,7 @@ LEFT JOIN LATERAL (
   WHERE r.sensor_id = s.sensor_id
   ORDER BY r.timestamp DESC LIMIT 1
 ) latest ON true
-WHERE s.status = 'Active';
+WHERE s.status IN ('Active', 'Maintenance');
         `;
         const result = await pool.query(query);
         res.json(result.rows[0].geojson);

@@ -5,7 +5,6 @@ const { getAllReadings, createReading, getWeeklyTrend } = require('../controller
 const { verifyToken, verifyAdmin } = require('../middleware/authMiddleware');
 const { fetchAndStoreWeatherData } = require('../services/openMeteoService');
 const { fetchAndStoreOpenAQData } = require('../services/openAQService');
-const { fetchAndStoreCurrentConditions } = require('../services/openWeatherMapService');
 
 // GET /api/readings/weekly-trend
 router.get('/weekly-trend', verifyToken, getWeeklyTrend);

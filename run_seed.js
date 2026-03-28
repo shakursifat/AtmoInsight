@@ -157,10 +157,10 @@ async function run() {
         // (AlertType and AlertThreshold already inserted above)
 
         // 12. Alert
-        await client.query(`INSERT INTO alert (reading_id, alert_type_id, message, timestamp, severity) VALUES
-            (4,  5, 'PM2.5 at Dhaka City Centre hit 178.9 µg/m³ — critical health risk.', '2025-01-16 06:05:00+06', 'Critical'),
-            (13, 2, 'Buriganga water level at 6.88 m exceeded the 5 m danger mark.',       '2025-06-12 00:10:00+06', 'High'),
-            (15, 3, 'Wind speed 34.7 m/s at Chittagong — gale-force storm approaching.',   '2025-05-14 14:05:00+06', 'High')`);
+        await client.query(`INSERT INTO alert (reading_id, alert_type_id, message, timestamp, severity, sensor_id, is_active, last_triggered_at) VALUES
+            (4,  5, 'PM2.5 at Dhaka City Centre hit 178.9 µg/m³ — critical health risk.', '2025-01-16 06:05:00+06', 'Critical', 1, true, '2025-01-16 06:05:00+06'),
+            (13, 2, 'Buriganga water level at 6.88 m exceeded the 5 m danger mark.',       '2025-06-12 00:10:00+06', 'High', 5, true, '2025-06-12 00:10:00+06'),
+            (15, 3, 'Wind speed 34.7 m/s at Chittagong — gale-force storm approaching.',   '2025-05-14 14:05:00+06', 'High', 7, true, '2025-05-14 14:05:00+06')`);
 
         // 13. ReportStatus
         await client.query(`INSERT INTO reportstatus (status_name, description) VALUES

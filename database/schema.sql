@@ -85,7 +85,11 @@ CREATE TABLE Alert (
     alert_type_id INTEGER REFERENCES AlertType(alert_type_id),
     message TEXT,
     timestamp TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
-    severity VARCHAR(20)
+    severity VARCHAR(20),
+    sensor_id INTEGER REFERENCES Sensor(sensor_id),
+    is_active BOOLEAN NOT NULL DEFAULT true,
+    resolved_at TIMESTAMPTZ,
+    last_triggered_at TIMESTAMPTZ
 );
 
 CREATE TABLE ReportStatus (

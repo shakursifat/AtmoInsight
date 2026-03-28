@@ -64,7 +64,7 @@ export default function InfoPanel() {
               ) : (
                 primary.map(c => (
                   <div
-                    key={c.measurement}
+                    key={c.reading_id ?? `${c.measurement}-${c.sensor_name}-${c.location_name}`}
                     className="flex items-center justify-between border-b border-border-subtle pb-2 last:border-0 last:pb-0"
                   >
                     <span className="text-sm text-text-primary">{c.measurement}</span>
@@ -111,7 +111,7 @@ export default function InfoPanel() {
           ) : (
             primary.map(c => (
               <div
-                key={c.measurement}
+                key={c.reading_id ?? `${c.measurement}-${c.sensor_name}-${c.location_name}`}
                 className="flex items-center justify-between border-b border-border-subtle pb-2 last:border-0 last:pb-0"
               >
                 <span className="text-sm text-text-primary">{c.measurement}</span>

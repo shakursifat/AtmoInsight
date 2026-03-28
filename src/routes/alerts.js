@@ -30,7 +30,8 @@ router.get('/active', async (req, res) => {
             JOIN location l ON s.location_id = l.location_id
             JOIN measurementtype mt ON r.measurement_type_id = mt.measurement_type_id
             JOIN measurementunit mu ON r.unit_id = mu.unit_id
-            WHERE a.timestamp >= NOW() - INTERVAL '24 hours'
+            WHERE COALESCE(a.is_active, true) = true
+              AND a.timestamp >= NOW() - INTERVAL '24 hours'
             ORDER BY a.timestamp DESC
         `;
         const result = await pool.query(query);
@@ -59,6 +60,7 @@ router.get('/active', async (req, res) => {
                 JOIN location l ON s.location_id = l.location_id
                 JOIN measurementtype mt ON r.measurement_type_id = mt.measurement_type_id
                 JOIN measurementunit mu ON r.unit_id = mu.unit_id
+                WHERE COALESCE(a.is_active, true) = true
                 ORDER BY a.timestamp DESC
                 LIMIT 20
             `;

@@ -7,7 +7,7 @@ const cron = require('node-cron');
 const pool = require('./src/db/pool');
 const { fetchAndStoreWeatherData } = require('./src/services/openMeteoService');
 const { fetchAndStoreOpenAQData } = require('./src/services/openAQService');
-const { fetchAndStoreCurrentConditions } = require('./src/services/openWeatherMapService');
+const { fetchAndStoreCurrentConditions } = require('./src/services/openWeatherService');
 const { fetchAndStoreIQAirData } = require('./src/services/iqairService');
 
 // Route imports
@@ -125,9 +125,15 @@ pool.connect().then(client => {
     client.on('notification', async (msg) => {
         try {
             if (msg.channel === 'new_alert_channel') {
-                const readingId = msg.payload;
+                let readingId = msg.payload;
+                if (typeof readingId === 'string' && readingId.startsWith('{')) {
+                    try {
+                        const parsed = JSON.parse(readingId);
+                        readingId = parsed.reading_id != null ? String(parsed.reading_id) : readingId;
+                    } catch (_) { /* use raw payload */ }
+                }
                 const alertRes = await pool.query(
-                    'SELECT * FROM alert WHERE reading_id = $1 ORDER BY timestamp DESC LIMIT 1',
+                    'SELECT * FROM alert WHERE reading_id = $1 ORDER BY COALESCE(last_triggered_at, timestamp) DESC LIMIT 1',
                     [readingId]
                 );
                 if (alertRes.rows.length > 0) {
@@ -233,7 +239,7 @@ const PORT = process.env.PORT || 5000;
 server.listen(PORT, () => {
     console.log(`\n✅  AtmoInsight Server running on port ${PORT}`);
     console.log(`   Open-Meteo sync:       every 30 min (free, no key needed)`);
-    console.log(`   OpenWeatherMap sync:   every 30 min (${process.env.OPENWEATHERMAP_API_KEY ? '✅ key found' : '⚠️  key missing — add OPENWEATHERMAP_API_KEY to .env'})`);
+    console.log(`   OpenWeatherMap sync:   every 30 min (${process.env.OPENWEATHER_API_KEY ? '✅ key found' : '⚠️  key missing — add OPENWEATHER_API_KEY to .env'})`);
     console.log(`   OpenAQ sync:           every 60 min (${process.env.OPENAQ_API_KEY        ? '✅ key found' : '⚠️  key missing — add OPENAQ_API_KEY to .env'})`);
     console.log(`   IQAir sync:            every 30 min (${process.env.IQAIR_API_KEY          ? '✅ key found' : '⚠️  key missing — add IQAIR_API_KEY to .env'})\n`);
 });

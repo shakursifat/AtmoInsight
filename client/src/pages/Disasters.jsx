@@ -95,7 +95,10 @@ export default function Disasters() {
             <div className="flex flex-col gap-3">
               <div className="text-xs font-semibold text-text-secondary uppercase mb-1">Events By Subgroup</div>
               {summary.map(s => (
-                <div key={s.subgroup || s.subgroup_name || s.disaster_type} className="flex flex-col gap-1">
+                <div
+                  key={`${s.subgroup || s.subgroup_name || ''}-${s.disaster_type || ''}`}
+                  className="flex flex-col gap-1"
+                >
                   <div className="flex items-center justify-between text-xs">
                     <span className="text-text-primary">{s.subgroup || s.subgroup_name || s.disaster_type}</span>
                     <span className="font-data text-text-muted">{formatNumber(s.event_count)}</span>

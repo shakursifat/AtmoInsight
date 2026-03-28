@@ -65,11 +65,20 @@ export default function Analytics() {
 
   const sensors = useMemo(() => {
     if (!geoData || !geoData.features) return [];
-    return geoData.features.map(f => ({
-      id: f.properties.sensor_id,
-      name: `${f.properties.name} (${f.properties.location_name})`,
-      locationId: f.properties.location_id,
-    }));
+    const seen = new Set();
+    const list = [];
+    for (const f of geoData.features) {
+      const id = f.properties?.sensor_id;
+      if (id == null || seen.has(id)) continue;
+      seen.add(id);
+      list.push({
+        id,
+        name: `${f.properties.name} (${f.properties.location_name})`,
+        locationId: f.properties.location_id,
+        status: f.properties?.status,
+      });
+    }
+    return list.sort((a, b) => String(a.name).localeCompare(String(b.name)));
   }, [geoData]);
 
   const [sensorId, setSensorId] = useState(1);
@@ -147,8 +156,9 @@ export default function Analytics() {
             className="bg-surface-primary border border-border-subtle text-text-primary px-3 py-2 rounded-md outline-none focus:border-accent-gold min-w-[200px]"
           >
             {sensors.map(s => (
-              <option key={s.id} value={s.id}>
+              <option key={`sensor-${s.id}`} value={s.id}>
                 {s.name}
+                {s.status && s.status !== 'Active' ? ` — ${s.status}` : ''}
               </option>
             ))}
           </select>

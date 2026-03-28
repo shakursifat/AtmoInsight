@@ -20,15 +20,59 @@
 CREATE OR REPLACE FUNCTION fn_create_alert_on_threshold()
 RETURNS TRIGGER AS $$
 DECLARE
-    v_threshold   RECORD;
-    v_alert_type  INTEGER;
-    v_severity    VARCHAR(20);
-    v_message     TEXT;
-    v_location_id INTEGER;
-    v_event_id    INTEGER;
+    v_threshold           RECORD;
+    v_alert_type          INTEGER;
+    v_severity            VARCHAR(20);
+    v_message             TEXT;
+    v_location_id         INTEGER;
+    v_event_id            INTEGER;
+    v_mt_name             TEXT;
+    v_breach              BOOLEAN;
+    v_existing_alert_id   INTEGER;
+    v_disaster_type_id    INTEGER;
+    v_is_meteo_subgroup   BOOLEAN;
+    v_wind                NUMERIC;
+    v_pressure            NUMERIC;
+    v_precip              NUMERIC;
+    v_existing_event_id   INTEGER;
 BEGIN
+    -- Map measurement type → alert_type (same convention as before)
+    SELECT type_name INTO v_mt_name
+    FROM measurementtype
+    WHERE measurement_type_id = NEW.measurement_type_id;
+
+    SELECT COALESCE(
+        (SELECT alert_type_id FROM alerttype
+         WHERE type_name ILIKE '%' || v_mt_name || '%'
+         LIMIT 1),
+        1
+    ) INTO v_alert_type;
+
+    -- Any threshold row breached for this measurement?
+    v_breach := EXISTS (
+        SELECT 1 FROM alertthreshold
+        WHERE measurement_type_id = NEW.measurement_type_id
+          AND (
+                (max_value IS NOT NULL AND NEW.value > max_value)
+             OR (min_value IS NOT NULL AND NEW.value < min_value)
+              )
+    );
+
     -- -------------------------------------------------------------------------
-    -- Step 1: Find any breached threshold for this measurement type
+    -- Resolution: reading back within limits → close active alert for this pair
+    -- -------------------------------------------------------------------------
+    IF NOT v_breach THEN
+        UPDATE alert
+        SET is_active = false,
+            resolved_at = NOW()
+        WHERE sensor_id = NEW.sensor_id
+          AND alert_type_id = v_alert_type
+          AND is_active = true;
+        RETURN NEW;
+    END IF;
+
+    -- -------------------------------------------------------------------------
+    -- Breach: pick the dominant threshold row (highest max still exceeded)
     -- -------------------------------------------------------------------------
     SELECT * INTO v_threshold
     FROM alertthreshold
@@ -37,37 +81,18 @@ BEGIN
             (max_value IS NOT NULL AND NEW.value > max_value)
          OR (min_value IS NOT NULL AND NEW.value < min_value)
           )
-    ORDER BY max_value DESC NULLS LAST    -- pick the most restrictive breach
+    ORDER BY max_value DESC NULLS LAST
     LIMIT 1;
 
     IF NOT FOUND THEN
-        RETURN NEW;  -- no threshold configured — nothing to do
+        RETURN NEW;
     END IF;
 
-    -- -------------------------------------------------------------------------
-    -- Step 2: Determine alert type and severity from the threshold record
-    -- -------------------------------------------------------------------------
     v_severity := COALESCE(v_threshold.severity, 'Low');
-
-    -- Upgrade severity when value is MUCH higher than the max threshold
     IF v_threshold.max_value IS NOT NULL AND NEW.value > v_threshold.max_value * 1.5 THEN
         v_severity := 'Critical';
     END IF;
 
-    -- Map measurement_type to a matching alert_type_id (graceful fallback to 1)
-    SELECT alert_type_id INTO v_alert_type
-    FROM alerttype
-    WHERE type_name ILIKE '%' || (
-            SELECT type_name FROM measurementtype
-            WHERE measurement_type_id = NEW.measurement_type_id
-          ) || '%'
-    LIMIT 1;
-
-    v_alert_type := COALESCE(v_alert_type, 1);
-
-    -- -------------------------------------------------------------------------
-    -- Step 3: Build a human-readable alert message
-    -- -------------------------------------------------------------------------
     v_message := FORMAT(
         'Threshold breached: sensor_id=%s recorded value=%s (threshold max=%s). Severity: %s.',
         NEW.sensor_id,
@@ -77,31 +102,150 @@ BEGIN
     );
 
     -- -------------------------------------------------------------------------
-    -- Step 4: Insert the alert
+    -- Deduplicate: one active alert per (sensor_id, alert_type_id)
     -- -------------------------------------------------------------------------
-    INSERT INTO alert (reading_id, alert_type_id, message, timestamp, severity)
-    VALUES (NEW.reading_id, v_alert_type, v_message, NOW(), v_severity);
+    SELECT alert_id INTO v_existing_alert_id
+    FROM alert
+    WHERE sensor_id = NEW.sensor_id
+      AND alert_type_id = v_alert_type
+      AND is_active = true
+    LIMIT 1;
+
+    IF v_existing_alert_id IS NOT NULL THEN
+        UPDATE alert
+        SET last_triggered_at = NOW(),
+            reading_id = NEW.reading_id,
+            message = v_message,
+            severity = v_severity
+        WHERE alert_id = v_existing_alert_id;
+    ELSE
+        INSERT INTO alert (
+            reading_id, alert_type_id, message, timestamp, severity,
+            sensor_id, is_active, last_triggered_at
+        )
+        VALUES (
+            NEW.reading_id, v_alert_type, v_message, NOW(), v_severity,
+            NEW.sensor_id, true, NOW()
+        );
+    END IF;
+
+    PERFORM pg_notify('new_alert_channel', NEW.reading_id::text);
 
     -- -------------------------------------------------------------------------
-    -- Step 5: Publish real-time notification to Node.js via pg_notify
+    -- Critical → classified disaster (merge within 12h at same location + type)
     -- -------------------------------------------------------------------------
-    PERFORM pg_notify('new_alert_channel', row_to_json(NEW)::text);
+    IF v_severity <> 'Critical' THEN
+        RETURN NEW;
+    END IF;
 
-    -- -------------------------------------------------------------------------
-    -- Step 6: Auto-generate DisasterEvent if severity is Critical
-    -- -------------------------------------------------------------------------
-    IF v_severity = 'Critical' THEN
-        SELECT location_id INTO v_location_id
-        FROM sensor WHERE sensor_id = NEW.sensor_id;
+    SELECT location_id INTO v_location_id
+    FROM sensor
+    WHERE sensor_id = NEW.sensor_id;
 
-        INSERT INTO disasterevent
-            (disaster_type_id, start_timestamp, severity, description, location_id)
-        VALUES
-            (1, NOW(), 'EXTREME',
-             FORMAT('Auto-generated disaster event: sensor %s exceeded critical threshold (%s).',
-                    NEW.sensor_id, NEW.value),
-             v_location_id)
+    IF v_location_id IS NULL THEN
+        RETURN NEW;
+    END IF;
+
+    v_disaster_type_id := CASE
+        WHEN v_mt_name ILIKE '%wind%' OR v_mt_name ILIKE '%pressure%' THEN 1
+        WHEN v_mt_name ILIKE '%temp%' OR v_mt_name ILIKE '%heat%' THEN 2
+        WHEN v_mt_name ILIKE '%water%' OR v_mt_name ILIKE '%level%' THEN 5
+        ELSE NULL
+    END;
+
+    IF v_disaster_type_id IS NULL THEN
+        RETURN NEW;
+    END IF;
+
+    SELECT EXISTS (
+        SELECT 1
+        FROM disastertype dt
+        WHERE dt.type_id = v_disaster_type_id
+          AND dt.subgroup_id = (
+              SELECT subgroup_id FROM disastersubgroup
+              WHERE subgroup_name = 'Meteorological'
+          )
+    ) INTO v_is_meteo_subgroup;
+
+    IF v_mt_name ILIKE '%wind%' THEN
+        v_wind := NEW.value;
+    ELSIF v_mt_name ILIKE '%pressure%' THEN
+        v_pressure := NEW.value;
+    ELSIF v_mt_name ILIKE '%precip%' OR v_mt_name ILIKE '%rain%' THEN
+        v_precip := NEW.value;
+    END IF;
+
+    SELECT de.event_id INTO v_existing_event_id
+    FROM disasterevent de
+    WHERE de.disaster_type_id = v_disaster_type_id
+      AND de.location_id = v_location_id
+      AND (
+            de.start_timestamp >= NOW() - INTERVAL '12 hours'
+         OR COALESCE(de.end_timestamp, de.start_timestamp) >= NOW() - INTERVAL '12 hours'
+          )
+    ORDER BY de.start_timestamp DESC
+    LIMIT 1;
+
+    IF v_existing_event_id IS NOT NULL THEN
+        UPDATE disasterevent
+        SET end_timestamp = NOW(),
+            severity = 'EXTREME',
+            description = FORMAT(
+                'Ongoing event (updated): sensor %s critical reading %s at %s.',
+                NEW.sensor_id, NEW.value, NOW()
+            )
+        WHERE event_id = v_existing_event_id;
+
+        IF v_is_meteo_subgroup THEN
+            IF EXISTS (SELECT 1 FROM meteorologicalevent WHERE event_id = v_existing_event_id) THEN
+                UPDATE meteorologicalevent
+                SET wind_speed = CASE
+                        WHEN v_wind IS NOT NULL THEN GREATEST(COALESCE(wind_speed, v_wind), v_wind)
+                        ELSE wind_speed
+                    END,
+                    pressure = CASE
+                        WHEN v_pressure IS NOT NULL THEN LEAST(COALESCE(pressure, v_pressure), v_pressure)
+                        ELSE pressure
+                    END,
+                    precipitation = CASE
+                        WHEN v_precip IS NOT NULL THEN GREATEST(COALESCE(precipitation, v_precip), v_precip)
+                        ELSE precipitation
+                    END
+                WHERE event_id = v_existing_event_id;
+            ELSE
+                INSERT INTO meteorologicalevent (event_id, wind_speed, pressure, precipitation, description)
+                VALUES (
+                    v_existing_event_id,
+                    v_wind, v_pressure, v_precip,
+                    'Auto-generated meteorological detail for ongoing event.'
+                );
+            END IF;
+        END IF;
+
+        PERFORM pg_notify('new_disaster_channel', v_existing_event_id::text);
+    ELSE
+        INSERT INTO disasterevent (
+            disaster_type_id, start_timestamp, end_timestamp, severity, description, location_id
+        )
+        VALUES (
+            v_disaster_type_id,
+            NOW(),
+            NOW(),
+            'EXTREME',
+            FORMAT('Auto-generated disaster event: sensor %s exceeded critical threshold (%s).',
+                   NEW.sensor_id, NEW.value),
+            v_location_id
+        )
         RETURNING event_id INTO v_event_id;
+
+        IF v_is_meteo_subgroup THEN
+            INSERT INTO meteorologicalevent (event_id, wind_speed, pressure, precipitation, description)
+            VALUES (
+                v_event_id,
+                v_wind, v_pressure, v_precip,
+                'Auto-generated meteorological detail.'
+            );
+        END IF;
 
         PERFORM pg_notify('new_disaster_channel', v_event_id::text);
     END IF;

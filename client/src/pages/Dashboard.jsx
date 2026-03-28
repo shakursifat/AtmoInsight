@@ -166,7 +166,7 @@ export default function Dashboard() {
           ) : (
             conditions.map(c => (
               <MetricCard
-                key={c.measurement}
+                key={c.reading_id ?? `${c.measurement}-${c.sensor_name}-${c.location_name}-${c.timestamp}`}
                 label={c.measurement}
                 value={Number(c.value).toFixed(1)}
                 unit={c.unit}

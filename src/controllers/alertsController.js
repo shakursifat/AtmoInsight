@@ -18,8 +18,11 @@ const createAlert = async (req, res) => {
         const { reading_id, alert_type_id, timestamp, message, severity } = req.body;
 
         const newAlert = await pool.query(
-            `INSERT INTO alert (reading_id, alert_type_id, timestamp, message, severity) 
-       VALUES ($1, $2, COALESCE($3, NOW()), $4, $5) RETURNING *`,
+            `INSERT INTO alert (reading_id, alert_type_id, timestamp, message, severity, sensor_id, is_active, last_triggered_at)
+             VALUES ($1, $2, COALESCE($3, NOW()), $4, $5,
+               (SELECT sensor_id FROM reading WHERE reading_id = $1),
+               true, NOW())
+             RETURNING *`,
             [reading_id, alert_type_id, timestamp, message, severity]
         );
 
