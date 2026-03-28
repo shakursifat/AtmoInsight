@@ -7,7 +7,7 @@ const pool = require('../db/pool');
 // POST /api/auth/register
 router.post('/register', async (req, res) => {
     try {
-        const { username, email, password } = req.body;
+        const { username, email, password, role } = req.body;
         
         if (!username || !email || !password) {
             return res.status(400).json({ error: 'Missing required fields' });
@@ -19,17 +19,22 @@ router.post('/register', async (req, res) => {
         }
 
         const hashedPassword = await bcrypt.hash(password, 10);
+        
+        // Map textual role to database ID
+        let roleId = 3; // Default Citizen
+        if (role === 'Admin') roleId = 1;
+        else if (role === 'Scientist') roleId = 2;
 
         const insertQuery = `
             INSERT INTO users (username, email, password_hash, role_id)
-            VALUES ($1, $2, $3, 3)
-            RETURNING user_id, username, email
+            VALUES ($1, $2, $3, $4)
+            RETURNING user_id, username, email, role_id
         `;
-        const result = await pool.query(insertQuery, [username, email, hashedPassword]);
+        const result = await pool.query(insertQuery, [username, email, hashedPassword, roleId]);
 
         const user = {
             ...result.rows[0],
-            role_name: 'Citizen'
+            role_name: role || 'Citizen'
         };
 
         res.status(201).json({ message: 'User registered successfully', user });
@@ -80,10 +85,12 @@ router.post('/login', async (req, res) => {
         res.json({
             token,
             user: {
+                id: user.user_id,
                 user_id: user.user_id,
                 username: user.username,
                 email: user.email,
-                role_name: user.role_name
+                role_name: user.role_name,
+                role_id: user.role_id
             }
         });
     } catch (err) {

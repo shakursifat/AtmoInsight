@@ -5,7 +5,7 @@ import { AlertTriangle, Loader2 } from 'lucide-react';
 
 export default function Login() {
   const [isLogin, setIsLogin] = useState(true);
-  const [formData, setFormData] = useState({ username: '', email: '', password: '' });
+  const [formData, setFormData] = useState({ username: '', email: '', password: '', role: 'Citizen' });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   
@@ -40,7 +40,8 @@ export default function Login() {
         const res = await client.post('/api/auth/register', {
           username: formData.username,
           email: formData.email,
-          password: formData.password
+          password: formData.password,
+          role: formData.role
         });
         
         // Upon successful registration, toggle back to login screen 
@@ -91,6 +92,22 @@ export default function Login() {
                 placeholder="monitor_user1"
                 disabled={loading}
               />
+            </div>
+          )}
+
+          {!isLogin && (
+            <div className="flex flex-col gap-2">
+              <label className="text-[11px] uppercase tracking-wider text-text-secondary font-semibold">Account Role</label>
+              <select
+                name="role"
+                value={formData.role}
+                onChange={handleInputChange}
+                disabled={loading}
+                className="bg-surface-secondary border border-border-subtle focus:border-data-blue outline-none rounded-md px-4 py-2.5 text-text-primary transition-colors disabled:opacity-50 text-sm"
+              >
+                <option value="Citizen">Citizen (Public Access)</option>
+                <option value="Admin">Admin (Core Access)</option>
+              </select>
             </div>
           )}
 

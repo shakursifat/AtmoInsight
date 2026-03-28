@@ -19,7 +19,7 @@ const verifyToken = (req, res, next) => {
 };
 
 const verifyAdmin = (req, res, next) => {
-    if (req.user && req.user.role === 'admin') {
+    if (req.user && (req.user.role_id === 1 || req.user.role_name === 'Admin' || req.user.role === 'admin')) {
         return next();
     }
     return res.status(403).json({ error: 'Requires admin privileges' });

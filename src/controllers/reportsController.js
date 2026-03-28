@@ -3,7 +3,7 @@ const pool = require('../db/pool');
 const createReport = async (req, res) => {
     try {
         const { location_id, description } = req.body;
-        const user_id = req.user.id; // From JWT
+        const user_id = req.user.user_id || req.user.id; // From JWT
 
         // Assume 1 = Pending, 2 = In Review, 3 = Resolved based on standard schemas
         const newReport = await pool.query(
@@ -20,14 +20,24 @@ const createReport = async (req, res) => {
 
 const getAllReports = async (req, res) => {
     try {
-        // Basic join to get usernames alongside reports
-        const result = await pool.query(`
-      SELECT ur.*, u.username 
-      FROM userreport ur
-      LEFT JOIN users u ON ur.user_id = u.user_id
-      ORDER BY ur.timestamp DESC
-      LIMIT 50
-    `);
+        const user_id = req.user.user_id || req.user.id;
+        const isAdmin = req.user.role_id === 1 || req.user.role_name === 'Admin' || req.user.role === 'admin';
+
+        let query = `
+            SELECT ur.*, u.username 
+            FROM userreport ur
+            LEFT JOIN users u ON ur.user_id = u.user_id
+        `;
+        let params = [];
+
+        if (!isAdmin) {
+            query += ` WHERE ur.user_id = $1`;
+            params.push(user_id);
+        }
+
+        query += ` ORDER BY ur.timestamp DESC LIMIT 50`;
+
+        const result = await pool.query(query, params);
         res.json(result.rows);
     } catch (error) {
         res.status(500).json({ error: error.message });
