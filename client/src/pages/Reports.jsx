@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import client from '../api/client';
+import { useSocket } from '../api/socket';
 import { Shield, FileText, Clock, CheckCircle, XCircle, MapPin, Loader2, AlertTriangle, PlusCircle } from 'lucide-react';
 
 export default function Reports() {
@@ -15,6 +16,18 @@ export default function Reports() {
   const [submitSuccess, setSubmitSuccess] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
+  const [locations, setLocations] = useState([]);
+  const socket = useSocket();
+
+  useEffect(() => {
+    if (!socket) return;
+    const handleStatusUpdate = (update) => {
+      setReports(prev => prev.map(r => r.report_id === update.report_id ? { ...r, status: update.new_status } : r));
+    };
+    socket.on('report_status_update', handleStatusUpdate);
+    return () => socket.off('report_status_update', handleStatusUpdate);
+  }, [socket]);
+
   useEffect(() => {
     const storedUser = localStorage.getItem('user');
     const token = localStorage.getItem('token');
@@ -22,20 +35,35 @@ export default function Reports() {
     if (storedUser && token) {
       const parsedUser = JSON.parse(storedUser);
       setUser(parsedUser);
-      // Fetch reports for all authenticated users (conditional logic is handled by backend now)
-      fetchReports();
+      // Fetch reports for all authenticated users
+      fetchReports(parsedUser);
+      fetchLocations();
     } else {
       setLoading(false);
     }
   }, []);
 
-  const fetchReports = async () => {
+  const fetchLocations = async () => {
+    try {
+      const res = await client.get('/api/lookup/locations');
+      setLocations(res.data.locations || []);
+      if (res.data.locations?.length > 0) {
+        setLocationId(res.data.locations[0].location_id.toString());
+      }
+    } catch (err) {
+      console.error('Failed to fetch locations:', err);
+    }
+  };
+
+  const fetchReports = async (currentUser) => {
     try {
       setLoading(true);
-      const res = await client.get('/api/reports', {
+      const isPrivileged = currentUser?.role_name === 'Admin' || currentUser?.role_name === 'Scientist' || currentUser?.role_id === 1 || currentUser?.role_id === 2;
+      const endpoint = isPrivileged ? '/api/reports/all' : '/api/reports/my';
+      const res = await client.get(endpoint, {
         headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
       });
-      setReports(res.data);
+      setReports(res.data.reports || []);
     } catch (err) {
       setError('Failed to load reports. ' + (err.response?.data?.error || err.message));
     } finally {
@@ -50,13 +78,13 @@ export default function Reports() {
     setSubmitSuccess(false);
     
     try {
-      await client.post('/api/reports', 
+      await client.post('/api/reports/submit', 
         { description, location_id: parseInt(locationId) },
         { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }}
       );
       setSubmitSuccess(true);
       setDescription('');
-      fetchReports(); // Refresh their personal list
+      fetchReports(user); // Refresh their personal list
     } catch (err) {
       setError('Failed to submit report. ' + (err.response?.data?.error || err.message));
     } finally {
@@ -66,24 +94,24 @@ export default function Reports() {
 
   const handleStatusChange = async (reportId, newStatusId) => {
     try {
-      await client.put(`/api/reports/${reportId}`, 
+      await client.put(`/api/reports/${reportId}/status`, 
         { status_id: parseInt(newStatusId) },
         { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }}
       );
       // Update local state to reflect change without refetching fully
-      setReports(prev => prev.map(r => r.report_id === reportId ? { ...r, status_id: parseInt(newStatusId) } : r));
+      fetchReports(user); // refetch fully to ensure sorting and status names are up to date
     } catch (err) {
       alert('Failed to update status: ' + (err.response?.data?.error || err.message));
     }
   };
 
-  const getStatusBadge = (statusId) => {
-    switch (statusId) {
-      case 1: return <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-amber-500/10 text-amber-500 border border-amber-500/20"><Clock className="w-3.5 h-3.5" /> Pending / Open</span>;
-      case 2: return <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-blue-500/10 text-blue-500 border border-blue-500/20"><AlertTriangle className="w-3.5 h-3.5" /> In Progress</span>;
-      case 3: return <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-emerald-500/10 text-emerald-500 border border-emerald-500/20"><CheckCircle className="w-3.5 h-3.5" /> Done / Resolved</span>;
-      case 4: return <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-red-500/10 text-red-500 border border-red-500/20"><XCircle className="w-3.5 h-3.5" /> Rejected</span>;
-      default: return <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-gray-500/10 text-gray-400 border border-gray-500/20">Unknown</span>;
+  const getStatusBadge = (statusName) => {
+    switch (statusName) {
+      case 'Open': return <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-amber-500/10 text-amber-500 border border-amber-500/20"><Clock className="w-3.5 h-3.5" /> Pending / Open</span>;
+      case 'In Progress': return <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-blue-500/10 text-blue-500 border border-blue-500/20"><AlertTriangle className="w-3.5 h-3.5" /> In Progress</span>;
+      case 'Resolved': return <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-emerald-500/10 text-emerald-500 border border-emerald-500/20"><CheckCircle className="w-3.5 h-3.5" /> Done / Resolved</span>;
+      case 'Rejected': return <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-red-500/10 text-red-500 border border-red-500/20"><XCircle className="w-3.5 h-3.5" /> Rejected</span>;
+      default: return <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-gray-500/10 text-gray-400 border border-gray-500/20">{statusName || 'Unknown'}</span>;
     }
   };
 
@@ -134,7 +162,7 @@ export default function Reports() {
             <div className="flex flex-col">
               <span className="text-xs text-text-muted uppercase tracking-wider font-semibold">Current Clearance</span>
               <span className="text-sm font-data font-medium text-text-primary">
-                {user?.role_id === 1 ? 'L1 : ADMIN' : 'L3 : CITIZEN'}
+                {user?.role_id === 1 ? 'L1 : ADMIN' : (user?.role_id === 2 ? 'L2 : SCIENTIST' : 'L3 : CITIZEN')}
               </span>
             </div>
           </div>
@@ -180,13 +208,9 @@ export default function Reports() {
                         required
                         className="w-full bg-surface-primary border border-border-subtle focus:border-data-blue outline-none rounded-md px-4 py-3 text-text-primary text-sm transition-colors"
                       >
-                        <option value="1">Dhaka City Centre</option>
-                        <option value="2">Mirpur</option>
-                        <option value="3">Buriganga River Bank</option>
-                        <option value="4">Dhanmondi Lake</option>
-                        <option value="6">Sylhet Airfield</option>
-                        <option value="7">Chittagong Port</option>
-                        <option value="8">Rajshahi Riverside</option>
+                        {locations.map(loc => (
+                          <option key={loc.location_id} value={loc.location_id}>{loc.name}</option>
+                        ))}
                       </select>
                     </div>
 
@@ -238,11 +262,11 @@ export default function Reports() {
                             </p>
                             <p className="text-sm text-text-primary">{report.description}</p>
                             <p className="text-xs text-text-secondary mt-2 flex items-center gap-1.5 font-medium">
-                              <MapPin className="w-3.5 h-3.5" /> Sector ID: {report.location_id}
+                              <MapPin className="w-3.5 h-3.5" /> Sector: {report.location_name}
                             </p>
                           </div>
                           <div className="shrink-0 mt-2 sm:mt-0">
-                            {getStatusBadge(report.status_id)}
+                            {getStatusBadge(report.status)}
                           </div>
                         </div>
                       ))}
@@ -290,13 +314,13 @@ export default function Reports() {
                                 {report.description}
                               </p>
                             </td>
-                            <td className="px-6 py-4 text-center font-data text-text-primary">{report.location_id}</td>
+                            <td className="px-6 py-4 text-center font-data text-text-primary">{report.location_name}</td>
                             <td className="px-6 py-4">
-                              {getStatusBadge(report.status_id)}
+                              {getStatusBadge(report.status)}
                             </td>
                             <td className="px-6 py-4">
                               <select
-                                value={report.status_id}
+                                value={report.status === 'Open' ? 1 : (report.status === 'In Progress' ? 2 : (report.status === 'Resolved' ? 3 : 4))}
                                 onChange={(e) => handleStatusChange(report.report_id, e.target.value)}
                                 className="bg-surface-primary border border-border-subtle focus:border-accent-gold text-text-primary text-xs rounded px-2 py-1.5 outline-none cursor-pointer"
                               >

@@ -118,6 +118,7 @@ io.on('connection', (socket) => {
 pool.connect().then(client => {
     client.query('LISTEN new_alert_channel');
     client.query('LISTEN new_disaster_channel');
+    client.query('LISTEN report_status_channel');
 
     client.on('notification', async (msg) => {
         try {
@@ -146,6 +147,14 @@ pool.connect().then(client => {
                     const newDisaster = disasterRes.rows[0];
                     io.emit('new_disaster', newDisaster);
                     console.log('[DB Trigger] CRITICAL: Real-time disaster emitted:', newDisaster);
+                }
+            } else if (msg.channel === 'report_status_channel') {
+                try {
+                    const statusUpdate = JSON.parse(msg.payload);
+                    io.emit('report_status_update', statusUpdate);
+                    console.log('[DB Trigger] Real-time report status emitted:', statusUpdate);
+                } catch (parseErr) {
+                    console.error('[DB Trigger] Error parsing report status:', parseErr.message);
                 }
             }
         } catch (err) {
