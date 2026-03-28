@@ -34,14 +34,46 @@ const getPollutionAverage = async (req, res) => {
         }
         const type = req.query.type || 'PM2.5';
         const interval = req.query.interval || '30 days';
+        const loc = parseInt(locationId, 10);
 
-        const result = await pool.query(
-            'SELECT * FROM get_pollution_average($1::integer, $2::text, $3::interval)',
-            [parseInt(locationId, 10), type, interval]
-        );
+        const aggSql = `
+            SELECT
+                l.name::TEXT AS location_name,
+                mt.type_name::TEXT AS measurement,
+                mu.symbol::TEXT AS unit_symbol,
+                ROUND(AVG(r.value)::numeric, 2) AS avg_value,
+                ROUND(MIN(r.value)::numeric, 2) AS min_value,
+                ROUND(MAX(r.value)::numeric, 2) AS max_value,
+                COUNT(*)::BIGINT AS reading_count,
+                (NOW() - $3::interval) AS from_time,
+                NOW() AS to_time
+            FROM reading r
+            JOIN sensor s ON r.sensor_id = s.sensor_id
+            JOIN location l ON s.location_id = l.location_id
+            JOIN measurementtype mt ON r.measurement_type_id = mt.measurement_type_id
+            JOIN measurementunit mu ON r.unit_id = mu.unit_id
+            WHERE l.location_id = $1
+              AND mt.type_name = $2
+              AND r.timestamp >= NOW() - $3::interval
+            GROUP BY l.name, mt.type_name, mu.symbol`;
+
+        const result = await pool.query(aggSql, [loc, type, interval]);
 
         if (result.rows.length === 0) {
-            return res.json({ data: null });
+            const fallback = await pool.query(
+                `SELECT
+                    (SELECT name FROM location WHERE location_id = $1)::TEXT AS location_name,
+                    $2::TEXT AS measurement,
+                    NULL::TEXT AS unit_symbol,
+                    NULL::NUMERIC AS avg_value,
+                    NULL::NUMERIC AS min_value,
+                    NULL::NUMERIC AS max_value,
+                    0::BIGINT AS reading_count,
+                    NOW() - $3::interval AS from_time,
+                    NOW() AS to_time`,
+                [loc, type, interval]
+            );
+            return res.json({ data: fallback.rows[0] });
         }
 
         res.json({ data: result.rows[0] });
@@ -64,10 +96,59 @@ const getNearbySensors = async (req, res) => {
         const typeParam = req.query.type;
         const type = typeParam === undefined || typeParam === '' ? null : typeParam;
 
-        const result = await pool.query(
-            'SELECT * FROM get_nearby_sensors($1::float8, $2::float8, $3::float8, $4::text)',
-            [parseFloat(lng), parseFloat(lat), radius, type]
-        );
+        const sql = `
+            SELECT
+                s.sensor_id,
+                s.name::TEXT AS sensor_name,
+                st.type_name::TEXT AS sensor_type,
+                l.name::TEXT AS location_name,
+                ROUND(
+                    ST_Distance(
+                        l.coordinates::geography,
+                        ST_SetSRID(ST_MakePoint($1::float8, $2::float8), 4326)::geography
+                    )::numeric,
+                    1
+                ) AS distance_metres,
+                s.status::TEXT,
+                (
+                    SELECT ROUND(r.value::numeric, 2)
+                    FROM reading r
+                    JOIN measurementtype mt ON r.measurement_type_id = mt.measurement_type_id
+                    WHERE r.sensor_id = s.sensor_id
+                      AND ($4::text IS NULL OR mt.type_name = $4)
+                    ORDER BY r.timestamp DESC
+                    LIMIT 1
+                ) AS latest_value,
+                (
+                    SELECT mu.symbol::TEXT
+                    FROM reading r
+                    JOIN measurementunit mu ON r.unit_id = mu.unit_id
+                    JOIN measurementtype mt ON r.measurement_type_id = mt.measurement_type_id
+                    WHERE r.sensor_id = s.sensor_id
+                      AND ($4::text IS NULL OR mt.type_name = $4)
+                    ORDER BY r.timestamp DESC
+                    LIMIT 1
+                ) AS latest_unit,
+                (
+                    SELECT r.timestamp
+                    FROM reading r
+                    JOIN measurementtype mt ON r.measurement_type_id = mt.measurement_type_id
+                    WHERE r.sensor_id = s.sensor_id
+                      AND ($4::text IS NULL OR mt.type_name = $4)
+                    ORDER BY r.timestamp DESC
+                    LIMIT 1
+                ) AS latest_timestamp
+            FROM sensor s
+            JOIN sensortype st ON s.sensor_type_id = st.sensor_type_id
+            JOIN location l ON s.location_id = l.location_id
+            WHERE ST_DWithin(
+                l.coordinates::geography,
+                ST_SetSRID(ST_MakePoint($1::float8, $2::float8), 4326)::geography,
+                $3::float8
+            )
+            ORDER BY distance_metres`;
+
+        const result = await pool.query(sql, [parseFloat(lng), parseFloat(lat), radius, type]);
 
         res.json({ sensors: result.rows });
     } catch (error) {
