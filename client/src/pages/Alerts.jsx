@@ -4,7 +4,7 @@ import { useActiveAlerts } from '../api/hooks';
 import AlertCard from '../components/shared/AlertCard';
 import LoadingSpinner from '../components/shared/LoadingSpinner';
 import EmptyState from '../components/shared/EmptyState';
-import { CheckCircle } from 'lucide-react';
+import { CheckCircle, Wind, Thermometer, Droplets, Activity } from 'lucide-react';
 
 function SectionError({ message, onRetry }) {
   return (
@@ -25,16 +25,64 @@ function SectionError({ message, onRetry }) {
   );
 }
 
+// Classify an alert into a high-level category for display/filtering
+function classifyAlert(alert) {
+  const m = (alert.measurement || alert.alert_type || '').toLowerCase();
+  if (m.includes('pm') || m.includes('aqi') || m.includes('no2') || m.includes('so2') || m.includes('co') || m.includes('o3') || m.includes('air')) {
+    return 'Air Quality';
+  }
+  if (m.includes('temp') || m.includes('heat') || m.includes('feels')) {
+    return 'Temperature';
+  }
+  if (m.includes('wind') || m.includes('pressure') || m.includes('gust')) {
+    return 'Wind & Pressure';
+  }
+  if (m.includes('rain') || m.includes('precip') || m.includes('water') || m.includes('flood') || m.includes('humid')) {
+    return 'Precipitation';
+  }
+  if (m.includes('uv') || m.includes('uvi') || m.includes('radiation')) {
+    return 'UV / Radiation';
+  }
+  return 'Other';
+}
+
+const SEVERITY_FILTERS = ['All', 'Critical', 'High', 'Moderate'];
+const CATEGORY_ICONS = {
+  'Air Quality':      Activity,
+  'Temperature':      Thermometer,
+  'Wind & Pressure':  Wind,
+  'Precipitation':    Droplets,
+};
+
 export default function Alerts() {
   const navigate = useNavigate();
   const { alerts, loading, error, refetch } = useActiveAlerts();
-  const [filter, setFilter] = useState('All');
+  const [severityFilter, setSeverityFilter] = useState('All');
+  const [categoryFilter, setCategoryFilter] = useState('All');
+
+  // Build unique categories from actual alerts
+  const categories = (() => {
+    if (!alerts?.length) return [];
+    const cats = new Set(alerts.map(classifyAlert));
+    return ['All', ...Array.from(cats).sort()];
+  })();
 
   const filtered = (alerts || []).filter(a => {
-    if (filter === 'All') return true;
-    const sev = (a.severity || a.alert_type || '').toLowerCase();
-    return sev === filter.toLowerCase();
+    const sevMatch =
+      severityFilter === 'All' ||
+      (a.severity || a.alert_type || '').toLowerCase() === severityFilter.toLowerCase();
+    const catMatch =
+      categoryFilter === 'All' || classifyAlert(a) === categoryFilter;
+    return sevMatch && catMatch;
   });
+
+  // Count per severity for badges
+  const countBySeverity = (alerts || []).reduce((acc, a) => {
+    const sev = (a.severity || 'safe').toLowerCase();
+    const key = sev.charAt(0).toUpperCase() + sev.slice(1);
+    acc[key] = (acc[key] || 0) + 1;
+    return acc;
+  }, {});
 
   const onAlertNavigate = useCallback(
     alert => {
@@ -56,30 +104,74 @@ export default function Alerts() {
 
   return (
     <div className="max-w-[1000px] mx-auto p-4 md:p-6 space-y-6 pb-24">
-      <header className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-border-subtle pb-4">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight mb-1">Alerts Log</h1>
-          <p className="text-text-muted text-sm">System and trigger alerts history</p>
+      <header className="flex flex-col gap-4 border-b border-border-subtle pb-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div>
+            <h1 className="text-2xl font-bold tracking-tight mb-1">Alerts Log</h1>
+            <p className="text-text-muted text-sm">
+              Real-time environmental threshold alerts by sensor &amp; category
+            </p>
+          </div>
+
+          {/* Severity filter pills */}
+          <div className="flex bg-surface-secondary p-1 rounded-md border border-border-subtle">
+            {SEVERITY_FILTERS.map(level => {
+              const isActive = severityFilter === level;
+              const count = level === 'All' ? (alerts || []).length : (countBySeverity[level] || 0);
+              return (
+                <button
+                  key={level}
+                  onClick={() => setSeverityFilter(level)}
+                  className={`text-xs px-3 py-1.5 rounded font-medium transition-colors duration-200 flex items-center gap-1.5 ${
+                    isActive
+                      ? 'bg-accent-gold text-surface-primary hover:bg-accent-gold/90'
+                      : 'text-text-secondary hover:text-text-primary hover:bg-surface-elevated'
+                  }`}
+                >
+                  {level}
+                  {count > 0 && (
+                    <span className={`text-[10px] font-bold rounded-full px-1 min-w-[18px] text-center ${
+                      isActive ? 'bg-surface-primary/30 text-surface-primary' : 'bg-surface-elevated text-text-muted'
+                    }`}>
+                      {count}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
         </div>
 
-        <div className="flex bg-surface-secondary p-1 rounded-md border border-border-subtle inline-flex">
-          {['All', 'Critical', 'High', 'Moderate'].map(level => {
-            const isActive = filter === level;
-            return (
-              <button
-                key={level}
-                onClick={() => setFilter(level)}
-                className={`text-xs px-3 py-1.5 rounded font-medium transition-colors duration-200 ${
-                  isActive
-                    ? 'bg-accent-gold text-surface-primary hover:bg-accent-gold/90'
-                    : 'text-text-secondary hover:text-text-primary hover:bg-surface-elevated'
-                }`}
-              >
-                {level}
-              </button>
-            );
-          })}
-        </div>
+        {/* Category tabs — only show when alerts have loaded */}
+        {!loading && categories.length > 1 && (
+          <div className="flex flex-wrap gap-2">
+            {categories.map(cat => {
+              const Icon = CATEGORY_ICONS[cat];
+              const isActive = categoryFilter === cat;
+              const count = cat === 'All'
+                ? (alerts || []).length
+                : (alerts || []).filter(a => classifyAlert(a) === cat).length;
+              return (
+                <button
+                  key={cat}
+                  type="button"
+                  onClick={() => setCategoryFilter(cat)}
+                  className={`flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-full border transition-colors duration-200 ${
+                    isActive
+                      ? 'bg-surface-elevated border-accent-gold text-accent-gold'
+                      : 'bg-surface-secondary border-border-subtle text-text-secondary hover:text-text-primary hover:border-text-muted'
+                  }`}
+                >
+                  {Icon && <Icon size={11} />}
+                  {cat}
+                  {count > 0 && (
+                    <span className="text-[10px] font-bold text-text-muted">({count})</span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        )}
       </header>
 
       <section className="min-h-[200px]">
@@ -93,7 +185,9 @@ export default function Alerts() {
           <EmptyState
             icon={CheckCircle}
             message={
-              filter !== 'All' ? `No ${filter} alerts` : 'System is quiet. No active alerts.'
+              severityFilter !== 'All' || categoryFilter !== 'All'
+                ? `No ${[severityFilter !== 'All' ? severityFilter : '', categoryFilter !== 'All' ? categoryFilter : ''].filter(Boolean).join(' / ')} alerts`
+                : 'System is quiet. No active alerts.'
             }
           />
         ) : (

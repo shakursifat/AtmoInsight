@@ -8,11 +8,115 @@ import { formatCurrency, formatNumber, formatPercent } from '../utils/format';
 
 const SUBGROUP_TABS = ['All', 'Meteorological', 'Climatological', 'Geophysical', 'Hydrological'];
 
+// Meteorological sub-type classification →  what type of event is it?
+const METEO_TYPE_CONFIG = {
+  cyclone:   { label: 'Cyclone',      icon: '🌀', color: 'text-severity-critical', bg: 'bg-severity-critical/10 border-severity-critical/30' },
+  typhoon:   { label: 'Typhoon',      icon: '🌀', color: 'text-severity-critical', bg: 'bg-severity-critical/10 border-severity-critical/30' },
+  hurricane: { label: 'Hurricane',    icon: '🌀', color: 'text-severity-critical', bg: 'bg-severity-critical/10 border-severity-critical/30' },
+  tornado:   { label: 'Tornado',      icon: '🌪️', color: 'text-severity-high',     bg: 'bg-severity-high/10 border-severity-high/30' },
+  storm:     { label: 'Severe Storm', icon: '⛈️', color: 'text-severity-high',     bg: 'bg-severity-high/10 border-severity-high/30' },
+  thunderstorm: { label: 'Thunderstorm', icon: '⛈️', color: 'text-severity-moderate', bg: 'bg-severity-moderate/10 border-severity-moderate/30' },
+  hail:      { label: 'Hailstorm',    icon: '🌨️', color: 'text-severity-moderate', bg: 'bg-severity-moderate/10 border-severity-moderate/30' },
+  dust:      { label: 'Dust Storm',   icon: '🌫️', color: 'text-severity-moderate', bg: 'bg-severity-moderate/10 border-severity-moderate/30' },
+  fog:       { label: 'Dense Fog',    icon: '🌫️', color: 'text-text-secondary',    bg: 'bg-surface-elevated border-border-subtle' },
+  wind:      { label: 'High Winds',   icon: '💨', color: 'text-data-blue',          bg: 'bg-data-blue/10 border-data-blue/30' },
+  snow:      { label: 'Snowstorm',    icon: '❄️', color: 'text-data-blue',          bg: 'bg-data-blue/10 border-data-blue/30' },
+  blizzard:  { label: 'Blizzard',     icon: '❄️', color: 'text-data-blue',          bg: 'bg-data-blue/10 border-data-blue/30' },
+};
+
+// Hydrological sub-types
+const HYDRO_TYPE_CONFIG = {
+  flood:     { label: 'Flood',        icon: '🌊', color: 'text-data-blue',          bg: 'bg-data-blue/10 border-data-blue/30' },
+  landslide: { label: 'Landslide',    icon: '⛰️', color: 'text-severity-high',      bg: 'bg-severity-high/10 border-severity-high/30' },
+  mudslide:  { label: 'Mudslide',     icon: '⛰️', color: 'text-severity-high',      bg: 'bg-severity-high/10 border-severity-high/30' },
+  tsunami:   { label: 'Tsunami',      icon: '🌊', color: 'text-severity-critical',  bg: 'bg-severity-critical/10 border-severity-critical/30' },
+  surge:     { label: 'Storm Surge',  icon: '🌊', color: 'text-severity-high',      bg: 'bg-severity-high/10 border-severity-high/30' },
+  drought:   { label: 'Drought',      icon: '☀️', color: 'text-severity-moderate',  bg: 'bg-severity-moderate/10 border-severity-moderate/30' },
+};
+
+// Geophysical sub-types
+const GEO_TYPE_CONFIG = {
+  earthquake: { label: 'Earthquake', icon: '🏔️', color: 'text-severity-critical',  bg: 'bg-severity-critical/10 border-severity-critical/30' },
+  volcano:    { label: 'Volcanic Eruption', icon: '🌋', color: 'text-severity-critical', bg: 'bg-severity-critical/10 border-severity-critical/30' },
+  eruption:   { label: 'Eruption',   icon: '🌋', color: 'text-severity-critical',  bg: 'bg-severity-critical/10 border-severity-critical/30' },
+  landslide:  { label: 'Rockslide',  icon: '⛰️', color: 'text-severity-high',      bg: 'bg-severity-high/10 border-severity-high/30' },
+};
+
+// Climatological sub-types
+const CLIM_TYPE_CONFIG = {
+  heatwave:  { label: 'Heat Wave',   icon: '🌡️', color: 'text-severity-critical',  bg: 'bg-severity-critical/10 border-severity-critical/30' },
+  cold:      { label: 'Cold Wave',   icon: '🥶', color: 'text-data-blue',           bg: 'bg-data-blue/10 border-data-blue/30' },
+  wildfire:  { label: 'Wildfire',    icon: '🔥', color: 'text-severity-critical',  bg: 'bg-severity-critical/10 border-severity-critical/30' },
+  fire:      { label: 'Wildfire',    icon: '🔥', color: 'text-severity-critical',  bg: 'bg-severity-critical/10 border-severity-critical/30' },
+  drought:   { label: 'Drought',     icon: '☀️', color: 'text-severity-moderate',  bg: 'bg-severity-moderate/10 border-severity-moderate/30' },
+};
+
+// Determine the specific disaster sub-type config from type_name / description / subgroup
+function getDisasterTypeConfig(disaster) {
+  const typeName = (disaster.disaster_type || '').toLowerCase();
+  const subgroup = (disaster.subgroup || '').toLowerCase();
+  const desc = (disaster.description || '').toLowerCase();
+  const searchStr = `${typeName} ${desc}`;
+
+  let configMap = {};
+  if (subgroup.includes('meteorolog')) configMap = METEO_TYPE_CONFIG;
+  else if (subgroup.includes('hydro')) configMap = HYDRO_TYPE_CONFIG;
+  else if (subgroup.includes('geophys')) configMap = GEO_TYPE_CONFIG;
+  else if (subgroup.includes('climatol')) configMap = CLIM_TYPE_CONFIG;
+
+  for (const [key, cfg] of Object.entries(configMap)) {
+    if (searchStr.includes(key)) return cfg;
+  }
+
+  // Fallback: try all maps
+  const allMaps = [METEO_TYPE_CONFIG, HYDRO_TYPE_CONFIG, GEO_TYPE_CONFIG, CLIM_TYPE_CONFIG];
+  for (const map of allMaps) {
+    for (const [key, cfg] of Object.entries(map)) {
+      if (searchStr.includes(key)) return cfg;
+    }
+  }
+
+  return null;
+}
+
+// Build readable description for auto-generated events
+function buildDisasterDescription(disaster, typeConfig) {
+  const raw = disaster.description || '';
+  const isAutoGenerated =
+    raw.startsWith('Auto-generated') ||
+    raw.startsWith('Ongoing event (updated)') ||
+    raw === '';
+
+  if (!isAutoGenerated) return raw;
+
+  const typeName = disaster.disaster_type || typeConfig?.label || disaster.subgroup || 'Disaster';
+  const location = [disaster.location_name, disaster.region].filter(Boolean).join(', ');
+  const sev = (disaster.severity || '').toLowerCase();
+
+  let msg = '';
+  if (sev === 'extreme' || sev === 'critical') {
+    msg = `Extreme ${typeName} event`;
+  } else if (sev === 'high') {
+    msg = `High-severity ${typeName} event`;
+  } else {
+    msg = `${typeName} event`;
+  }
+
+  if (location) msg += ` recorded in ${location}`;
+  msg += '. Sensor readings exceeded critical thresholds.';
+
+  return msg;
+}
+
 function forecastProbClass(pct) {
   if (pct > 80) return 'text-severity-high';
   if (pct > 60) return 'text-severity-moderate';
   return 'text-text-secondary';
 }
+
+// Meteorological type filter tabs (shown when Meteorological subgroup is selected)
+const METEO_TYPE_TABS = ['All Types', 'Cyclone', 'Typhoon', 'Hurricane', 'Tornado', 'Severe Storm', 'Thunderstorm'];
+const HYDRO_TYPE_TABS = ['All Types', 'Flood', 'Landslide', 'Mudslide', 'Tsunami', 'Storm Surge'];
 
 export default function Disasters() {
   const { disasters, loading: distLoading, error: distErr, refetch: refetchDisasters } = useDisasters();
@@ -25,12 +129,36 @@ export default function Disasters() {
   } = useForecasts(0.5, true);
 
   const [subgroup, setSubgroup] = useState('All');
+  const [typeFilter, setTypeFilter] = useState('All Types');
+
+  // Reset type filter when subgroup changes
+  const handleSubgroupChange = (sg) => {
+    setSubgroup(sg);
+    setTypeFilter('All Types');
+  };
 
   const filtered = useMemo(() => {
     if (!disasters?.length) return [];
-    if (subgroup === 'All') return disasters;
-    return disasters.filter(d => (d.subgroup || '').toLowerCase() === subgroup.toLowerCase());
-  }, [disasters, subgroup]);
+    let list = subgroup === 'All'
+      ? disasters
+      : disasters.filter(d => (d.subgroup || '').toLowerCase() === subgroup.toLowerCase());
+
+    if (typeFilter !== 'All Types') {
+      list = list.filter(d => {
+        const cfg = getDisasterTypeConfig(d);
+        return cfg?.label?.toLowerCase() === typeFilter.toLowerCase();
+      });
+    }
+
+    return list;
+  }, [disasters, subgroup, typeFilter]);
+
+  // Which type tabs to show for the active subgroup
+  const typeTabsForSubgroup = useMemo(() => {
+    if (subgroup === 'Meteorological') return METEO_TYPE_TABS;
+    if (subgroup === 'Hydrological') return HYDRO_TYPE_TABS;
+    return null;
+  }, [subgroup]);
 
   const renderImpact = (lbl, val, isMoney = false) => {
     if (val === null || val === undefined || val === '' || val === '0') return null;
@@ -93,24 +221,36 @@ export default function Disasters() {
             </div>
 
             <div className="flex flex-col gap-3">
-              <div className="text-xs font-semibold text-text-secondary uppercase mb-1">Events By Subgroup</div>
-              {summary.map(s => (
-                <div
-                  key={`${s.subgroup || s.subgroup_name || ''}-${s.disaster_type || ''}`}
-                  className="flex flex-col gap-1"
-                >
-                  <div className="flex items-center justify-between text-xs">
-                    <span className="text-text-primary">{s.subgroup || s.subgroup_name || s.disaster_type}</span>
-                    <span className="font-data text-text-muted">{formatNumber(s.event_count)}</span>
+              <div className="text-xs font-semibold text-text-secondary uppercase mb-1">Events By Type</div>
+              {summary.map(s => {
+                // Find a matching type config for the icon
+                const fakeDisaster = {
+                  disaster_type: s.disaster_type || '',
+                  subgroup: s.subgroup || s.subgroup_name || '',
+                  description: '',
+                };
+                const cfg = getDisasterTypeConfig(fakeDisaster);
+                return (
+                  <div
+                    key={`${s.subgroup || s.subgroup_name || ''}-${s.disaster_type || ''}`}
+                    className="flex flex-col gap-1"
+                  >
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="text-text-primary flex items-center gap-1.5">
+                        {cfg?.icon && <span>{cfg.icon}</span>}
+                        {s.disaster_type || s.subgroup || s.subgroup_name}
+                      </span>
+                      <span className="font-data text-text-muted">{formatNumber(s.event_count)}</span>
+                    </div>
+                    <div className="w-full h-1.5 bg-surface-primary rounded-full overflow-hidden">
+                      <div
+                        className="h-full bg-data-blue"
+                        style={{ width: `${Math.min((s.event_count / 5) * 100, 100)}%` }}
+                      />
+                    </div>
                   </div>
-                  <div className="w-full h-1.5 bg-surface-primary rounded-full overflow-hidden">
-                    <div
-                      className="h-full bg-data-blue"
-                      style={{ width: `${Math.min((s.event_count / 5) * 100, 100)}%` }}
-                    />
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
         )}
@@ -172,6 +312,7 @@ export default function Disasters() {
           <p className="text-text-muted text-sm">Chronological events and severity ratings</p>
         </header>
 
+        {/* Subgroup tabs */}
         <div className="flex flex-wrap gap-2 border-b border-border-subtle pb-3">
           {SUBGROUP_TABS.map(tab => {
             const active = subgroup === tab;
@@ -179,7 +320,7 @@ export default function Disasters() {
               <button
                 key={tab}
                 type="button"
-                onClick={() => setSubgroup(tab)}
+                onClick={() => handleSubgroupChange(tab)}
                 className={`text-xs px-3 py-2 rounded-t-md transition-colors border-b-2 ${
                   active
                     ? 'text-accent-gold border-accent-gold bg-surface-elevated/50'
@@ -192,7 +333,34 @@ export default function Disasters() {
           })}
         </div>
 
-        <div className="relative border-l-2 border-border-subtle pl-6 space-y-8 ml-2 mt-4">
+        {/* Sub-type filter buttons (Meteorological → Cyclone, Typhoon, Tornado…) */}
+        {typeTabsForSubgroup && (
+          <div className="flex flex-wrap gap-2 -mt-3">
+            {typeTabsForSubgroup.map(tab => {
+              const active = typeFilter === tab;
+              // Find icon for the specific type
+              const allConfigs = { ...METEO_TYPE_CONFIG, ...HYDRO_TYPE_CONFIG };
+              const cfg = Object.values(allConfigs).find(c => c.label === tab);
+              return (
+                <button
+                  key={tab}
+                  type="button"
+                  onClick={() => setTypeFilter(tab)}
+                  className={`flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-full border transition-colors duration-200 ${
+                    active
+                      ? `bg-surface-elevated border-accent-gold text-accent-gold`
+                      : 'bg-surface-secondary border-border-subtle text-text-secondary hover:text-text-primary hover:border-text-muted'
+                  }`}
+                >
+                  {cfg?.icon && <span>{cfg.icon}</span>}
+                  {tab}
+                </button>
+              );
+            })}
+          </div>
+        )}
+
+        <div className="relative border-l-2 border-border-subtle pl-6 space-y-8 ml-2 mt-2">
           {distLoading ? (
             <div className="flex justify-center py-16">
               <LoadingSpinner />
@@ -219,6 +387,7 @@ export default function Disasters() {
                 high: 'border-severity-high bg-severity-high',
                 moderate: 'border-severity-moderate bg-severity-moderate',
                 safe: 'border-severity-safe bg-severity-safe',
+                extreme: 'border-severity-critical bg-severity-critical',
               };
               const sevNorm = (d.severity || '').toLowerCase();
               const bColor = borderColors[sevNorm] || borderColors.safe;
@@ -229,6 +398,9 @@ export default function Disasters() {
                 lat != null && lng != null
                   ? `/?lat=${encodeURIComponent(lat)}&lng=${encodeURIComponent(lng)}&zoom=13&disaster=${encodeURIComponent(d.event_id)}`
                   : null;
+
+              const typeConfig = getDisasterTypeConfig(d);
+              const displayDescription = buildDisasterDescription(d, typeConfig);
 
               return (
                 <div
@@ -243,9 +415,25 @@ export default function Disasters() {
                   <div className="bg-surface-secondary border border-border-subtle rounded-lg p-5 group-hover:bg-surface-elevated transition-colors shadow-sm">
                     <div className="flex flex-wrap items-start justify-between gap-3 mb-2">
                       <div className="flex items-center gap-2 flex-wrap">
-                        <span className="bg-surface-primary border border-border-subtle text-text-secondary font-medium px-2 py-0.5 rounded text-xs">
-                          {d.disaster_type}
-                        </span>
+                        {/* Specific disaster type tag (e.g. Cyclone, Tornado, Flood) */}
+                        {typeConfig ? (
+                          <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-xs font-semibold border ${typeConfig.bg} ${typeConfig.color}`}>
+                            <span>{typeConfig.icon}</span>
+                            {typeConfig.label}
+                          </span>
+                        ) : (
+                          <span className="bg-surface-primary border border-border-subtle text-text-secondary font-medium px-2 py-0.5 rounded text-xs">
+                            {d.disaster_type}
+                          </span>
+                        )}
+
+                        {/* Subgroup badge when not filtered */}
+                        {subgroup === 'All' && d.subgroup && (
+                          <span className="bg-surface-primary border border-border-subtle text-text-muted px-2 py-0.5 rounded text-[10px] uppercase tracking-wider">
+                            {d.subgroup}
+                          </span>
+                        )}
+
                         <SeverityBadge severity={d.severity} />
                       </div>
 
@@ -261,7 +449,9 @@ export default function Disasters() {
                       </div>
                     </div>
 
-                    <p className="text-sm text-text-primary mt-3 leading-relaxed max-w-2xl">{d.description}</p>
+                    <p className="text-sm text-text-primary mt-3 leading-relaxed max-w-2xl">
+                      {displayDescription}
+                    </p>
 
                     <div className="flex flex-wrap gap-2 mt-4">
                       {renderImpact('Deaths', d.deaths)}

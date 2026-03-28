@@ -93,12 +93,19 @@ BEGIN
         v_severity := 'Critical';
     END IF;
 
+    -- Build a human-readable, categorized alert message
     v_message := FORMAT(
-        'Threshold breached: sensor_id=%s recorded value=%s (threshold max=%s). Severity: %s.',
-        NEW.sensor_id,
+        '%s %s sensor reading of %s exceeded safe threshold (limit: %s). Sensor ID: %s.',
+        CASE v_severity
+            WHEN 'Critical' THEN '🚨 CRITICAL'
+            WHEN 'High'     THEN '⚠️ High'
+            WHEN 'Moderate' THEN '⚡ Elevated'
+            ELSE                 'ℹ️ Notice'
+        END,
+        v_mt_name,
         NEW.value,
         COALESCE(v_threshold.max_value::text, 'N/A'),
-        v_severity
+        NEW.sensor_id
     );
 
     -- -------------------------------------------------------------------------

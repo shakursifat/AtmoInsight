@@ -1,1 +1,1 @@
-select * from userrole
+select * from alerttype
