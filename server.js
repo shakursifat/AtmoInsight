@@ -21,6 +21,7 @@ const mapRoutes = require('./src/routes/map');
 const sensorsRoutes = require('./src/routes/sensors');
 const lookupRoutes = require('./src/routes/lookup');
 const currentConditionsRoutes = require('./src/routes/currentConditions');
+const forecastsRoutes = require('./src/routes/forecasts');
 
 const app = express();
 const server = http.createServer(app);
@@ -53,6 +54,7 @@ app.use('/api/map', mapRoutes);
 app.use('/api/sensors', sensorsRoutes);
 app.use('/api/lookup', lookupRoutes);
 app.use('/api/current-conditions', currentConditionsRoutes);
+app.use('/api/forecasts', forecastsRoutes);
 
 // ─── Root / Health ────────────────────────────────────────────────────────────
 app.get('/', (req, res) => {

@@ -17,9 +17,12 @@ router.get('/active', async (req, res) => {
                 r.value AS trigger_value,
                 mt.type_name AS measurement,
                 mu.symbol AS unit,
+                s.sensor_id,
                 s.name AS sensor_name,
                 l.name AS location_name,
-                l.region
+                l.region,
+                ST_Y(l.coordinates::geometry) AS latitude,
+                ST_X(l.coordinates::geometry) AS longitude
             FROM alert a
             JOIN alerttype at ON a.alert_type_id = at.alert_type_id
             JOIN reading r ON a.reading_id = r.reading_id
@@ -43,9 +46,12 @@ router.get('/active', async (req, res) => {
                     r.value AS trigger_value,
                     mt.type_name AS measurement,
                     mu.symbol AS unit,
+                    s.sensor_id,
                     s.name AS sensor_name,
                     l.name AS location_name,
-                    l.region
+                    l.region,
+                    ST_Y(l.coordinates::geometry) AS latitude,
+                    ST_X(l.coordinates::geometry) AS longitude
                 FROM alert a
                 JOIN alerttype at ON a.alert_type_id = at.alert_type_id
                 JOIN reading r ON a.reading_id = r.reading_id

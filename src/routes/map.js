@@ -14,6 +14,7 @@ SELECT json_build_object(
       'geometry', ST_AsGeoJSON(l.coordinates)::json,
       'properties', json_build_object(
         'sensor_id', s.sensor_id,
+        'location_id', l.location_id,
         'name', s.name,
         'status', s.status,
         'sensor_type', st.type_name,
