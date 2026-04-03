@@ -1,4 +1,4 @@
-import { Routes, Route } from 'react-router-dom';
+import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import AppShell from './layouts/AppShell';
 import MapExplorer from './pages/MapExplorer';
 import Dashboard from './pages/Dashboard';
@@ -9,13 +9,29 @@ import Reports from './pages/Reports';
 import Login from './pages/Login';
 import { useSocket } from './api/socket';
 
+function ProtectedRoute({ children }) {
+  const location = useLocation();
+  const token = localStorage.getItem('token');
+  if (!token) {
+    return <Navigate to="/login" state={{ from: location }} replace />;
+  }
+  return children;
+}
+
 function App() {
   // Init socket once at app level
   useSocket();
 
   return (
     <Routes>
-      <Route path="/" element={<AppShell />}>
+      <Route
+        path="/"
+        element={
+          <ProtectedRoute>
+            <AppShell />
+          </ProtectedRoute>
+        }
+      >
         <Route index element={<MapExplorer />} />
         <Route path="dashboard" element={<Dashboard />} />
         <Route path="alerts" element={<Alerts />} />

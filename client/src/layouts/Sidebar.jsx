@@ -111,7 +111,7 @@ export default function Sidebar() {
               className="flex items-center gap-3 px-1 text-text-secondary hover:text-text-primary transition-colors duration-200 text-sm font-medium"
             >
               <User className="w-5 h-5 shrink-0" />
-              <span className="hidden md:block">Guest Console</span>
+              <span className="hidden md:block">Citizen Console</span>
             </NavLink>
           )}
         </div>

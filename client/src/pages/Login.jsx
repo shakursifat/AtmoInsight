@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import client from '../api/client';
 import { AlertTriangle, Loader2 } from 'lucide-react';
 
@@ -10,6 +10,8 @@ export default function Login() {
   const [loading, setLoading] = useState(false);
   
   const navigate = useNavigate();
+  const location = useLocation();
+  const from = location.state?.from?.pathname || '/dashboard';
 
   const handleInputChange = (e) => {
     setFormData(prev => ({ ...prev, [e.target.name]: e.target.value }));
@@ -34,7 +36,7 @@ export default function Login() {
         
         // Broadcast custom event so the Sidebar updates
         window.dispatchEvent(new Event('auth-change'));
-        navigate('/dashboard'); // route to dashboard after auth
+        navigate(from, { replace: true }); // send back to where they came from
       } else {
         // Registration
         const res = await client.post('/api/auth/register', {
@@ -158,10 +160,7 @@ export default function Login() {
             </button>
           </div>
         </form>
-        
-        <div className="mt-16 text-sm">
-           <Link to="/" className="text-text-muted hover:text-text-primary transition-colors">&larr; Return to Live Guest Map</Link>
-        </div>
+
       </div>
       
       {/* Decorative Right Side for Desktop */}
