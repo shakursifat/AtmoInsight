@@ -11,6 +11,7 @@ import {
   LogOut,
   Menu,
   X,
+  ShieldCheck,
 } from 'lucide-react';
 
 const PRIMARY_LINKS = [
@@ -75,12 +76,21 @@ export default function Sidebar() {
         </div>
 
         <nav className="flex-1 px-2 pt-6 space-y-1">
-          {[...PRIMARY_LINKS, ...MORE_LINKS].map(link => (
+          {[...PRIMARY_LINKS, ...MORE_LINKS].filter(link => 
+            !(link.label === 'Reports' && user?.role_name?.toLowerCase() === 'admin')
+          ).map(link => (
             <NavLink key={link.to} to={link.to} end={link.to === '/'} className={navClass}>
               <link.icon className="w-5 h-5 shrink-0" />
               <span className="hidden md:block text-sm font-medium">{link.label}</span>
             </NavLink>
           ))}
+          {/* Admin-only link */}
+          {user?.role_name?.toLowerCase() === 'admin' && (
+            <NavLink to="/admin-panel" className={navClass}>
+              <ShieldCheck className="w-5 h-5 shrink-0" />
+              <span className="hidden md:block text-sm font-medium">Control Panel</span>
+            </NavLink>
+          )}
         </nav>
 
         <div className="p-4 border-t border-border-subtle w-full flex flex-col gap-2">
@@ -168,7 +178,9 @@ export default function Sidebar() {
               </button>
             </div>
             <div className="flex flex-col gap-1">
-              {MORE_LINKS.map(link => (
+              {MORE_LINKS.filter(link => 
+                !(link.label === 'Reports' && user?.role_name?.toLowerCase() === 'admin')
+              ).map(link => (
                 <NavLink
                   key={link.to}
                   to={link.to}
@@ -179,6 +191,17 @@ export default function Sidebar() {
                   <span className="text-sm font-medium">{link.label}</span>
                 </NavLink>
               ))}
+              {/* Admin-only link in mobile drawer */}
+              {user?.role_name?.toLowerCase() === 'admin' && (
+                <NavLink
+                  to="/admin-panel"
+                  onClick={() => setMoreOpen(false)}
+                  className="flex items-center gap-3 px-3 py-3 rounded-lg text-accent-gold hover:bg-surface-elevated transition-colors duration-200"
+                >
+                  <ShieldCheck className="w-5 h-5" />
+                  <span className="text-sm font-medium">Control Panel</span>
+                </NavLink>
+              )}
             </div>
             <div className="mt-6 pt-4 border-t border-border-subtle">
               {user ? (

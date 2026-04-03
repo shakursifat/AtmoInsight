@@ -7,6 +7,7 @@ import Disasters from './pages/Disasters';
 import Analytics from './pages/Analytics';
 import Reports from './pages/Reports';
 import Login from './pages/Login';
+import AdminControlPanel from './pages/AdminControlPanel';
 import { useSocket } from './api/socket';
 
 function ProtectedRoute({ children }) {
@@ -38,6 +39,7 @@ function App() {
         <Route path="disasters" element={<Disasters />} />
         <Route path="analytics" element={<Analytics />} />
         <Route path="reports" element={<Reports />} />
+        <Route path="admin-panel" element={<AdminControlPanel />} />
       </Route>
       <Route path="/login" element={<Login />} />
     </Routes>

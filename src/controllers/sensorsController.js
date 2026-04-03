@@ -128,4 +128,68 @@ const createSensor = async (req, res) => {
     }
 };
 
-module.exports = { getSensors, getSensorTypes, getLocations, createSensor };
+// GET /api/sensors/nearby  (admin only)
+// Query params: lat, lng, radius (metres, default 10000), type (measurement name, optional)
+const getNearbySensors = async (req, res) => {
+    const { lng, lat } = req.query;
+
+    if (!lng || String(lng).trim() === '') {
+        return res.status(400).json({ error: 'lng is required' });
+    }
+    if (!lat || String(lat).trim() === '') {
+        return res.status(400).json({ error: 'lat is required' });
+    }
+
+    const radius = req.query.radius != null ? parseFloat(req.query.radius) : 10000;
+    const measurement = req.query.type && req.query.type.trim() !== '' ? req.query.type.trim() : null;
+
+    try {
+        const params = [parseFloat(lng), parseFloat(lat), radius];
+        let query = `
+            SELECT
+                s.sensor_id,
+                s.name,
+                st.type_name,
+                l.name        AS location_name,
+                l.address,
+                l.region,
+                s.status,
+                ST_Y(l.coordinates::geometry) AS lat,
+                ST_X(l.coordinates::geometry) AS lng,
+                ST_Distance(
+                    l.coordinates::geography,
+                    ST_SetSRID(ST_MakePoint($1, $2), 4326)::geography
+                ) AS distance_metres
+            FROM sensor s
+            JOIN location     l  ON s.location_id      = l.location_id
+            JOIN sensortype   st ON s.sensor_type_id   = st.sensor_type_id
+            WHERE ST_DWithin(
+                l.coordinates::geography,
+                ST_SetSRID(ST_MakePoint($1, $2), 4326)::geography,
+                $3
+            )
+        `;
+
+        if (measurement) {
+            params.push(measurement);
+            query += `
+            AND EXISTS (
+                SELECT 1
+                FROM reading r
+                JOIN measurementtype mt ON r.measurement_type_id = mt.measurement_type_id
+                WHERE r.sensor_id = s.sensor_id
+                  AND mt.type_name ILIKE $${params.length}
+            )`;
+        }
+
+        query += ' ORDER BY distance_metres';
+
+        const result = await pool.query(query, params);
+        res.json({ sensors: result.rows });
+    } catch (error) {
+        console.error('[getNearbySensors] Error:', error.message);
+        res.status(500).json({ error: error.message });
+    }
+};
+
+module.exports = { getSensors, getSensorTypes, getLocations, createSensor, getNearbySensors };

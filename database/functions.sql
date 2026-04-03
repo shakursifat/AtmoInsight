@@ -154,30 +154,19 @@ $$;
 --   SELECT * FROM get_nearby_sensors(90.4074, 23.7104, 15000, 'PM2.5');
 -- =============================================================================
 
-CREATE OR REPLACE FUNCTION get_nearby_sensors(
+CREATE OR REPLACE PROCEDURE get_nearby_sensors(
     p_longitude     FLOAT8,
     p_latitude      FLOAT8,
     p_radius_metres FLOAT8 DEFAULT 10000,
-    p_measurement   TEXT   DEFAULT NULL
-)
-RETURNS TABLE (
-    sensor_id        INTEGER,
-    sensor_name      TEXT,
-    sensor_type      TEXT,
-    location_name    TEXT,
-    distance_metres  NUMERIC,
-    status           TEXT,
-    latest_value     NUMERIC,
-    latest_unit      TEXT,
-    latest_timestamp TIMESTAMPTZ
+    p_measurement   TEXT   DEFAULT NULL,
+    OUT result_cursor REFCURSOR
 )
 LANGUAGE plpgsql
-STABLE
 AS $$
 DECLARE
     v_ref_point GEOMETRY := ST_SetSRID(ST_MakePoint(p_longitude, p_latitude), 4326);
 BEGIN
-    RETURN QUERY
+    OPEN result_cursor FOR
     SELECT
         s.sensor_id,
         s.name::TEXT                                                     AS sensor_name,
@@ -235,7 +224,8 @@ $$;
 -- =============================================================================
 -- SELECT * FROM get_pollution_average(1, 'PM2.5', INTERVAL '365 days');
 -- SELECT * FROM get_disaster_impact_summary(NULL, NULL);
--- SELECT * FROM get_nearby_sensors(90.4074, 23.7104, 20000, 'PM2.5');
+-- CALL get_nearby_sensors(90.4074, 23.7104, 20000, 'PM2.5', NULL);
+-- FETCH ALL FROM "<refcursor>";
 -- =============================================================================
 -- End of functions.sql
 -- =============================================================================
