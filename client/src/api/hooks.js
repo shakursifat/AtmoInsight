@@ -111,3 +111,8 @@ export function useMonthlyTrend(type = 'PM2.5', months = 12) {
   const { data, loading, error, refetch } = useFetch('/api/analytics/monthly-trend', { type, months });
   return { data: data?.data || [], loading, error, refetch, meta: { type: data?.type, months: data?.months } };
 }
+
+export function useSensorTypes() {
+  const { data, loading, error, refetch } = useFetch('/api/sensors/types');
+  return { types: data || [], loading, error, refetch };
+}

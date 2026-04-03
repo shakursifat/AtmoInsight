@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useMemo, useCallback } from 'react';
-import Map, { NavigationControl } from 'react-map-gl/mapbox';
+import Map, { NavigationControl, Marker } from 'react-map-gl/mapbox';
 import { useSearchParams } from 'react-router-dom';
 import 'mapbox-gl/dist/mapbox-gl.css';
 import { useSensorsGeoJSON, useDisastersGeoJSON } from '../api/hooks';
@@ -9,7 +9,9 @@ import SensorPopup from '../components/map/SensorPopup';
 import DisasterPopup from '../components/map/DisasterPopup';
 import InfoPanel from '../components/map/InfoPanel';
 import LayerToggles from '../components/map/LayerToggles';
+import AddSensorPanel from '../components/map/AddSensorPanel';
 import LoadingSpinner from '../components/shared/LoadingSpinner';
+import { Plus, Crosshair, X } from 'lucide-react';
 
 const mapboxToken = import.meta.env.VITE_MAPBOX_TOKEN;
 
@@ -32,11 +34,29 @@ function getFeatureCenterCoords(feature) {
   return null;
 }
 
+function getUser() {
+  try {
+    const stored = localStorage.getItem('user');
+    return stored ? JSON.parse(stored) : null;
+  } catch {
+    return null;
+  }
+}
+
 export default function MapExplorer() {
   const mapRef = useRef();
   const [searchParams] = useSearchParams();
-  const { data: sensors, loading: sLoading } = useSensorsGeoJSON();
+  const { data: sensors, loading: sLoading, refetch: refetchSensors } = useSensorsGeoJSON();
   const { data: disasters, loading: dLoading } = useDisastersGeoJSON();
+
+  // Admin state
+  const user = useMemo(() => getUser(), []);
+  const isAdmin = user?.role_id === 1;
+
+  // Placement mode state
+  const [placementMode, setPlacementMode] = useState(false);
+  const [pickedCoords, setPickedCoords] = useState(null); // [lng, lat]
+  const [showPanel, setShowPanel] = useState(false);
 
   const urlView = useMemo(() => {
     const lat = parseFloat(searchParams.get('lat'));
@@ -126,6 +146,15 @@ export default function MapExplorer() {
   }, [mapLoaded, disasters, urlView.disasterId, urlView.sensorId, urlView.zoom, flyTo]);
 
   const onMapClick = useCallback(event => {
+    // If in placement mode, capture the click as sensor coordinates
+    if (placementMode) {
+      const { lng, lat } = event.lngLat;
+      setPickedCoords([lng, lat]);
+      setShowPanel(true);
+      setPlacementMode(false);
+      return;
+    }
+
     const hit = event.features?.find(f => f.layer?.id === 'disaster-polys');
     if (hit) {
       event.originalEvent.stopPropagation();
@@ -140,7 +169,33 @@ export default function MapExplorer() {
     }
     setActiveSensor(null);
     setActiveDisaster(null);
-  }, []);
+  }, [placementMode]);
+
+  const handleEnterPlacement = () => {
+    setPlacementMode(true);
+    setPickedCoords(null);
+    setShowPanel(false);
+    setActiveSensor(null);
+    setActiveDisaster(null);
+  };
+
+  const handleCancelPlacement = () => {
+    setPlacementMode(false);
+    setPickedCoords(null);
+    setShowPanel(false);
+  };
+
+  const handlePanelClose = () => {
+    setShowPanel(false);
+    setPickedCoords(null);
+  };
+
+  const handleSensorCreated = () => {
+    refetchSensors();
+  };
+
+  // Cursor style based on mode
+  const cursorStyle = placementMode ? 'crosshair' : '';
 
   if (!mapboxToken || mapboxToken.includes('pk.eyJ1IjoiYXRt')) {
     return (
@@ -171,6 +226,7 @@ export default function MapExplorer() {
         onClick={onMapClick}
         onLoad={onMapLoad}
         attributionControl={false}
+        cursor={cursorStyle}
       >
         <NavigationControl position="bottom-right" />
 
@@ -187,16 +243,28 @@ export default function MapExplorer() {
           <SensorLayer
             data={sensors}
             onClick={f => {
-              setActiveSensor(f);
-              setActiveDisaster(null);
+              if (!placementMode) {
+                setActiveSensor(f);
+                setActiveDisaster(null);
+              }
             }}
           />
         )}
 
-        {activeSensor && (
+        {/* Placement mode preview marker */}
+        {pickedCoords && (
+          <Marker longitude={pickedCoords[0]} latitude={pickedCoords[1]} anchor="center">
+            <div className="relative flex items-center justify-center">
+              <div className="absolute w-8 h-8 rounded-full bg-accent-gold/25 animate-ping" />
+              <div className="w-4 h-4 rounded-full bg-accent-gold border-2 border-surface-primary shadow-lg" />
+            </div>
+          </Marker>
+        )}
+
+        {activeSensor && !placementMode && (
           <SensorPopup feature={activeSensor} onClose={() => setActiveSensor(null)} />
         )}
-        {activeDisaster && (
+        {activeDisaster && !placementMode && (
           <DisasterPopup feature={activeDisaster} onClose={() => setActiveDisaster(null)} />
         )}
       </Map>
@@ -204,6 +272,47 @@ export default function MapExplorer() {
       <div className="absolute inset-0 pointer-events-none">
         <LayerToggles layers={layers} setLayers={setLayers} />
         <InfoPanel />
+
+        {/* Admin: Add Sensor Button */}
+        {isAdmin && !placementMode && !showPanel && (
+          <button
+            id="add-sensor-btn"
+            onClick={handleEnterPlacement}
+            className="pointer-events-auto absolute bottom-6 right-6 md:bottom-8 md:right-8 bg-accent-gold text-surface-primary px-4 py-2.5 rounded-lg font-bold text-sm shadow-lg hover:bg-accent-gold/90 transition-all duration-200 flex items-center gap-2 hover:shadow-xl hover:scale-[1.02] active:scale-[0.98]"
+          >
+            <Plus className="w-4 h-4" />
+            Add Sensor
+          </button>
+        )}
+
+        {/* Placement Mode Banner */}
+        {placementMode && (
+          <div className="pointer-events-auto absolute top-6 left-1/2 -translate-x-1/2 bg-surface-secondary/95 backdrop-blur-xl border border-accent-gold/50 rounded-xl px-5 py-3 shadow-2xl flex items-center gap-3 animate-fade-in">
+            <div className="w-8 h-8 rounded-full bg-accent-gold/15 border border-accent-gold/30 flex items-center justify-center shrink-0">
+              <Crosshair className="w-4 h-4 text-accent-gold" />
+            </div>
+            <div className="flex flex-col">
+              <span className="text-sm font-bold text-text-primary">Click on the map</span>
+              <span className="text-[11px] text-text-muted">Select a location for the new sensor</span>
+            </div>
+            <button
+              onClick={handleCancelPlacement}
+              className="ml-3 p-1.5 rounded-md hover:bg-surface-elevated text-text-muted hover:text-text-primary transition-colors"
+              aria-label="Cancel placement"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        )}
+
+        {/* Add Sensor Panel */}
+        {showPanel && pickedCoords && (
+          <AddSensorPanel
+            coordinates={pickedCoords}
+            onClose={handlePanelClose}
+            onSensorCreated={handleSensorCreated}
+          />
+        )}
       </div>
     </div>
   );
