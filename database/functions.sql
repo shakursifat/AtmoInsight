@@ -122,7 +122,7 @@ BEGIN
         COALESCE(SUM(di.affected_people),  0)::BIGINT   AS total_affected,
         COALESCE(SUM(di.economic_loss),    0)           AS total_economic_loss,
         -- Most common severity across events in this group
-        MODE() WITHIN GROUP (ORDER BY de.severity)      AS avg_severity
+        (MODE() WITHIN GROUP (ORDER BY de.severity))::TEXT  AS avg_severity
     FROM disasterevent    de
     JOIN disastertype     dt  ON de.disaster_type_id = dt.type_id
     JOIN disastersubgroup ds  ON dt.subgroup_id      = ds.subgroup_id
@@ -130,7 +130,8 @@ BEGIN
     WHERE (p_subgroup_name IS NULL OR ds.subgroup_name ILIKE p_subgroup_name)
       AND (p_year          IS NULL OR EXTRACT(YEAR FROM de.start_timestamp) = p_year)
     GROUP BY ds.subgroup_name, dt.type_name
-    ORDER BY total_deaths DESC, total_affected DESC;
+    ORDER BY total_deaths DESC, total_affected DESC
+    LIMIT 50;
 END;
 $$;
 
