@@ -3,8 +3,12 @@ const router = express.Router();
 const pool = require('../db/pool');
 
 // GET /api/disasters
+// Accepts optional ?limit=N (default 100, max 500) and ?offset=N for pagination
 router.get('/', async (req, res) => {
     try {
+        const limit  = Math.min(parseInt(req.query.limit)  || 100, 500);
+        const offset = Math.max(parseInt(req.query.offset) || 0,   0);
+
         const query = `
             SELECT 
                 d.event_id, 
@@ -28,9 +32,10 @@ router.get('/', async (req, res) => {
             JOIN location l ON d.location_id = l.location_id
             LEFT JOIN disasterimpact di ON d.event_id = di.event_id
             ORDER BY d.start_timestamp DESC
+            LIMIT $1 OFFSET $2
         `;
-        const result = await pool.query(query);
-        res.json({ disasters: result.rows });
+        const result = await pool.query(query, [limit, offset]);
+        res.json({ disasters: result.rows, limit, offset });
     } catch (err) {
         console.error(err);
         res.status(500).json({ error: 'Internal server error' });
@@ -38,6 +43,7 @@ router.get('/', async (req, res) => {
 });
 
 // GET /api/disasters/summary
+// Accepts optional ?subgroup= and ?year= filters
 router.get('/summary', async (req, res) => {
     try {
         const subgroup = req.query.subgroup != null && String(req.query.subgroup).trim() !== ''
@@ -69,7 +75,8 @@ router.get('/summary', async (req, res) => {
             WHERE ($1::text IS NULL OR ds.subgroup_name ILIKE $1)
               AND ($2::integer IS NULL OR EXTRACT(YEAR FROM de.start_timestamp) = $2)
             GROUP BY ds.subgroup_name, dt.type_name
-            ORDER BY total_deaths DESC, total_affected DESC`;
+            ORDER BY total_deaths DESC, total_affected DESC
+            LIMIT 50`;
 
         const result = await pool.query(query, [subgroup, year]);
         res.json({ summary: result.rows });

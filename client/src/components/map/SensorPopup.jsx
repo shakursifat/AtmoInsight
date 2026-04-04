@@ -1,9 +1,11 @@
+import { useNavigate } from 'react-router-dom';
 import { Popup } from 'react-map-gl/mapbox';
 import RelativeTime from '../shared/RelativeTime';
 
 export default function SensorPopup({ feature, onClose }) {
   const p = feature.properties;
   const coords = feature.geometry.coordinates;
+  const navigate = useNavigate();
 
   let colorClass = 'text-data-blue';
   if (p.latest_measurement === 'PM2.5') {
@@ -12,6 +14,14 @@ export default function SensorPopup({ feature, onClose }) {
       else if (val > 75) colorClass = 'text-severity-high';
       else if (val > 35) colorClass = 'text-severity-moderate';
       else colorClass = 'text-severity-safe';
+  }
+
+  function handleViewHistory() {
+    // Navigate to Analytics page with this sensor pre-selected.
+    // Use the sensor's latest measurement type if available, otherwise default to PM2.5.
+    const type = p.latest_measurement || 'PM2.5';
+    navigate(`/analytics?sensorId=${p.sensor_id}&type=${encodeURIComponent(type)}`);
+    onClose();
   }
 
   return (
@@ -39,8 +49,9 @@ export default function SensorPopup({ feature, onClose }) {
         </div>
         
         <button 
-          onClick={() => console.log(`Viewing history for ${p.sensor_id}`)}
-          className="mt-3 text-[11px] text-data-blue hover:text-accent-gold transition-colors text-left"
+          id={`view-history-sensor-${p.sensor_id}`}
+          onClick={handleViewHistory}
+          className="mt-3 text-[11px] text-data-blue hover:text-accent-gold transition-colors text-left font-semibold"
         >
           View History &rarr;
         </button>

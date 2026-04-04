@@ -1,4 +1,5 @@
 import { useState, useMemo, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import {
   useTimeseries,
   useSensorsGeoJSON,
@@ -61,7 +62,12 @@ function indicatorValueClass(valueStr) {
 }
 
 export default function Analytics() {
+  const [searchParams] = useSearchParams();
   const { data: geoData } = useSensorsGeoJSON();
+
+  // Read deep-link params passed from SensorPopup "View History" button
+  const urlSensorId = searchParams.get('sensorId');
+  const urlType     = searchParams.get('type');
 
   const sensors = useMemo(() => {
     if (!geoData || !geoData.features) return [];
@@ -81,15 +87,25 @@ export default function Analytics() {
     return list.sort((a, b) => String(a.name).localeCompare(String(b.name)));
   }, [geoData]);
 
-  const [sensorId, setSensorId] = useState(1);
-  const [type, setType] = useState('PM2.5');
-  const [days, setDays] = useState(30);
+  const [sensorId, setSensorId] = useState(urlSensorId ?? 1);
+  const [type, setType]         = useState(urlType ?? 'PM2.5');
+  const [days, setDays]         = useState(30);
+  const [deepLinked, setDeepLinked] = useState(!!urlSensorId);
 
+  // Once sensors load, validate that the URL sensor actually exists
   useEffect(() => {
-    if (sensors.length > 0 && !sensors.find(s => String(s.id) === String(sensorId))) {
+    if (sensors.length === 0) return;
+    if (urlSensorId && sensors.find(s => String(s.id) === String(urlSensorId))) {
+      // URL sensor is valid — keep it
+      setSensorId(urlSensorId);
+      if (urlType) setType(urlType);
+    } else if (!sensors.find(s => String(s.id) === String(sensorId))) {
+      // Fallback: URL sensor not found, pick the first available
       setSensorId(sensors[0].id);
+      setDeepLinked(false);
     }
-  }, [sensors, sensorId]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sensors]);
 
   const selectedLocationId = useMemo(() => {
     const s = sensors.find(x => String(x.id) === String(sensorId));
@@ -145,8 +161,31 @@ export default function Analytics() {
     return [...set];
   }, [correlations]);
 
+  // Name of the currently selected sensor for the deep-link banner
+  const selectedSensor = useMemo(
+    () => sensors.find(s => String(s.id) === String(sensorId)),
+    [sensors, sensorId]
+  );
+
   return (
     <div className="h-full flex flex-col overflow-x-hidden">
+
+      {/* Deep-link banner — shown when coming from the map popup */}
+      {deepLinked && selectedSensor && (
+        <div className="bg-accent-gold/10 border-b border-accent-gold/30 px-4 py-2 flex items-center justify-between shrink-0">
+          <span className="text-xs text-accent-gold font-semibold">
+            📍 Showing history for <strong>{selectedSensor.name}</strong>
+          </span>
+          <button
+            onClick={() => setDeepLinked(false)}
+            className="text-[10px] text-text-muted hover:text-text-primary transition-colors ml-4"
+            aria-label="Dismiss"
+          >
+            ✕
+          </button>
+        </div>
+      )}
+
       <div className="bg-surface-secondary border-b border-border-subtle p-4 flex flex-col sm:flex-row gap-4 flex-wrap items-end shrink-0">
         <div className="flex flex-col gap-1 w-full sm:w-auto">
           <label className="text-xs font-semibold text-text-secondary uppercase">Sensor Location</label>
