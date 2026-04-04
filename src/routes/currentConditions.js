@@ -2,12 +2,13 @@ const express = require('express');
 const router = express.Router();
 const pool = require('../db/pool');
 const { fetchCurrentConditionsByLocation } = require('../services/openWeatherService');
+const { verifyToken } = require('../middleware/authMiddleware');
 
 // GET /api/current-conditions?location_id=<id>
 // Fetches OpenWeatherMap current weather + air pollution, stores readings, returns JSON.
 // GET /api/current-conditions (no query)
 // Returns the latest reading for each unique measurement type across all active sensors.
-router.get('/', async (req, res) => {
+router.get('/', verifyToken, async (req, res) => {
     if (req.query.location_id !== undefined && req.query.location_id !== '') {
         const locationId = parseInt(req.query.location_id, 10);
         if (Number.isNaN(locationId) || locationId <= 0) {

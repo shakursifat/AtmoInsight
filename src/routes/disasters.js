@@ -1,10 +1,11 @@
 const express = require('express');
 const router = express.Router();
 const pool = require('../db/pool');
+const { verifyToken, verifyAdmin } = require('../middleware/authMiddleware');
 
 // GET /api/disasters
 // Accepts optional ?limit=N (default 500, max 1000), ?offset=N for pagination, and ?subgroup=
-router.get('/', async (req, res) => {
+router.get('/', verifyToken, async (req, res) => {
     try {
         const limit  = Math.min(parseInt(req.query.limit)  || 500, 1000);
         const offset = Math.max(parseInt(req.query.offset) || 0,   0);
@@ -59,7 +60,7 @@ router.get('/', async (req, res) => {
 // GET /api/disasters/summary
 // Accepts optional ?subgroup= and ?year= filters
 // Delegates to the get_disaster_impact_summary database function
-router.get('/summary', async (req, res) => {
+router.get('/summary', verifyToken, async (req, res) => {
     try {
         const subgroup = req.query.subgroup != null && String(req.query.subgroup).trim() !== ''
             ? req.query.subgroup
@@ -85,7 +86,7 @@ router.get('/summary', async (req, res) => {
 });
 
 // PATCH /api/disasters/:id/impact
-router.patch('/:id/impact', async (req, res) => {
+router.patch('/:id/impact', [verifyToken, verifyAdmin], async (req, res) => {
     const client = await pool.connect();
     try {
         const eventId = req.params.id;

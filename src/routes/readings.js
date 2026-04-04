@@ -42,7 +42,7 @@ router.get('/update-air-quality', verifyToken, async (req, res) => {
 });
 
 // GET /api/readings/timeseries/:sensorId
-router.get('/timeseries/:sensorId', async (req, res) => {
+router.get('/timeseries/:sensorId', verifyToken, async (req, res) => {
     try {
         const { sensorId } = req.params;
         const type = req.query.type;

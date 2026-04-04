@@ -8,7 +8,7 @@ const { verifyToken, verifyAdmin } = require('../middleware/authMiddleware');
 // Returns up to 50 active alerts. Uses a single query with a dynamic time
 // window: tries last 24 h first; if fewer than 5 results, expands to all-time.
 // This avoids the previous double-round-trip fallback pattern.
-router.get('/active', async (req, res) => {
+router.get('/active', verifyToken, async (req, res) => {
     try {
         const query = `
             WITH recent AS (

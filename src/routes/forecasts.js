@@ -1,8 +1,9 @@
 const express = require('express');
 const router = express.Router();
 const pool = require('../db/pool');
+const { verifyToken } = require('../middleware/authMiddleware');
 
-router.get('/', async (req, res) => {
+router.get('/', verifyToken, async (req, res) => {
     try {
         const minProb = req.query.min_probability != null ? parseFloat(req.query.min_probability) : 0;
         const upcomingParam = req.query.upcoming_only;

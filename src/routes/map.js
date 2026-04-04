@@ -1,9 +1,10 @@
 const express = require('express');
 const router = express.Router();
 const pool = require('../db/pool');
+const { verifyToken } = require('../middleware/authMiddleware');
 
 // GET /api/map/sensors
-router.get('/sensors', async (req, res) => {
+router.get('/sensors', verifyToken, async (req, res) => {
     try {
         const query = `
 SELECT json_build_object(
@@ -50,7 +51,7 @@ WHERE s.status IN ('Active', 'Maintenance');
 });
 
 // GET /api/map/disasters
-router.get('/disasters', async (req, res) => {
+router.get('/disasters', verifyToken, async (req, res) => {
     try {
         const query = `
 SELECT json_build_object(

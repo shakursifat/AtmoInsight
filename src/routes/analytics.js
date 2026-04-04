@@ -10,11 +10,11 @@ const {
 } = require('../controllers/analyticsController');
 const { verifyToken } = require('../middleware/authMiddleware');
 
-router.get('/pollution-average', getPollutionAverage);
-router.get('/nearby-sensors', getNearbySensors);
-router.get('/monthly-trend', getMonthlyTrend);
-router.get('/satellite-correlation', getSatelliteCorrelation);
-router.get('/climate-indicators', getClimateIndicators);
+router.get('/pollution-average', verifyToken, getPollutionAverage);
+router.get('/nearby-sensors', verifyToken, getNearbySensors);
+router.get('/monthly-trend', verifyToken, getMonthlyTrend);
+router.get('/satellite-correlation', verifyToken, getSatelliteCorrelation);
+router.get('/climate-indicators', verifyToken, getClimateIndicators);
 
 router.get('/daily', verifyToken, getDailyAverages);
 

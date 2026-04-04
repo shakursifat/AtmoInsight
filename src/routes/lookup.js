@@ -11,7 +11,7 @@ router.get('/measurement-types', verifyToken, getMeasurementTypes);
 router.get('/measurement-units', verifyToken, getMeasurementUnits);
 
 // GET /api/lookup/locations
-router.get('/locations', async (req, res) => {
+router.get('/locations', verifyToken, async (req, res) => {
     try {
         const query = `
             SELECT 
