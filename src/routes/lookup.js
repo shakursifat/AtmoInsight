@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const { getMeasurementTypes, getMeasurementUnits } = require('../controllers/lookupController');
-const { verifyToken } = require('../middleware/auth');
+const { verifyToken } = require('../middleware/authMiddleware');
 const pool = require('../db/pool');
 
 // GET /api/lookup/measurement-types

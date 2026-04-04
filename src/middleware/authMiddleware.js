@@ -5,12 +5,12 @@ const verifyToken = (req, res, next) => {
     const token = authHeader && authHeader.split(' ')[1]; // Format: "Bearer <token>"
 
     if (!token) {
-        return res.status(403).json({ error: 'A token is required for authentication' });
+        return res.status(401).json({ error: 'A token is required for authentication' });
     }
 
     try {
         const decoded = jwt.verify(token, process.env.JWT_SECRET);
-        req.user = decoded; // Will contain id, email, role
+        req.user = decoded; // Contains user_id, username, email, role_id, role_name
     } catch (err) {
         return res.status(401).json({ error: 'Invalid Token' });
     }
@@ -19,13 +19,26 @@ const verifyToken = (req, res, next) => {
 };
 
 const verifyAdmin = (req, res, next) => {
-    if (req.user && (req.user.role_id === 1 || req.user.role_name === 'Admin' || req.user.role === 'admin')) {
+    if (req.user && (req.user.role_id === 1 || req.user.role_name === 'Admin')) {
         return next();
     }
     return res.status(403).json({ error: 'Requires admin privileges' });
 };
 
+const roleGuard = (allowedRoles) => {
+    return (req, res, next) => {
+        if (!req.user || !req.user.role_name) {
+            return res.status(403).json({ error: 'Access denied: Role missing' });
+        }
+        if (allowedRoles.includes(req.user.role_name)) {
+            return next();
+        }
+        return res.status(403).json({ error: 'Access denied: Insufficient permissions' });
+    };
+};
+
 module.exports = {
     verifyToken,
-    verifyAdmin
+    verifyAdmin,
+    roleGuard
 };

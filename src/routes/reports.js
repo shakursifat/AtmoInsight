@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const pool = require('../db/pool');
-const { verifyToken, roleGuard } = require('../middleware/auth');
+const { verifyToken, roleGuard } = require('../middleware/authMiddleware');
 
 // POST /api/reports/submit
 router.post('/submit', verifyToken, async (req, res) => {
