@@ -194,20 +194,28 @@ const getNearbySensors = async (req, res) => {
 
 // DELETE /api/sensors/:id  (admin only)
 const deleteSensor = async (req, res) => {
+    const client = await pool.connect();
     try {
         const { id } = req.params;
         if (!id) {
             return res.status(400).json({ error: 'Sensor ID is required' });
         }
 
+        await client.query('BEGIN');
+
         // Call the stored procedure to safely delete the sensor and its dependencies
-        await pool.query('CALL delete_sensor($1::integer)', [parseInt(id, 10)]);
+        await client.query('CALL delete_sensor($1::integer)', [parseInt(id, 10)]);
+
+        await client.query('COMMIT');
 
         res.json({ message: `Sensor ${id} successfully deleted` });
     } catch (error) {
+        await client.query('ROLLBACK');
         console.error('[deleteSensor] Error:', error.message);
         // Catch constraint errors or non-existent errors though our procedure is resilient 
         res.status(500).json({ error: error.message });
+    } finally {
+        client.release();
     }
 };
 

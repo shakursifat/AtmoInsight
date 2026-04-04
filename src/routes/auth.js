@@ -6,6 +6,7 @@ const pool = require('../db/pool');
 
 // POST /api/auth/register
 router.post('/register', async (req, res) => {
+    const client = await pool.connect();
     try {
         const { username, email, password, role } = req.body;
         
@@ -13,8 +14,11 @@ router.post('/register', async (req, res) => {
             return res.status(400).json({ error: 'Missing required fields' });
         }
 
-        const emailCheck = await pool.query('SELECT user_id FROM users WHERE email = $1', [email]);
+        await client.query('BEGIN');
+
+        const emailCheck = await client.query('SELECT user_id FROM users WHERE email = $1', [email]);
         if (emailCheck.rows.length > 0) {
+            await client.query('ROLLBACK');
             return res.status(409).json({ error: 'Email already exists' });
         }
 
@@ -30,7 +34,9 @@ router.post('/register', async (req, res) => {
             VALUES ($1, $2, $3, $4)
             RETURNING user_id, username, email, role_id
         `;
-        const result = await pool.query(insertQuery, [username, email, hashedPassword, roleId]);
+        const result = await client.query(insertQuery, [username, email, hashedPassword, roleId]);
+
+        await client.query('COMMIT');
 
         const user = {
             ...result.rows[0],
@@ -39,8 +45,11 @@ router.post('/register', async (req, res) => {
 
         res.status(201).json({ message: 'User registered successfully', user });
     } catch (err) {
+        await client.query('ROLLBACK');
         console.error(err);
         res.status(500).json({ error: 'Internal server error' });
+    } finally {
+        client.release();
     }
 });
 

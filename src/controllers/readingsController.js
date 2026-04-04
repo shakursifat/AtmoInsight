@@ -55,15 +55,20 @@ const getAllReadings = async (req, res) => {
 };
 
 const createReading = async (req, res) => {
+    const client = await pool.connect();
     try {
         const { source_id, sensor_id, timestamp, value, measurement_type_id, unit_id } = req.body;
 
+        await client.query('BEGIN');
+
         // Using actual neon schema fields: source_id, sensor_id, timestamp, value, measurement_type_id, unit_id
-        const newReading = await pool.query(
+        const newReading = await client.query(
             `INSERT INTO reading (source_id, sensor_id, timestamp, value, measurement_type_id, unit_id) 
-       VALUES ($1, $2, COALESCE($3, NOW()), $4, $5, $6) RETURNING *`,
+             VALUES ($1, $2, COALESCE($3, NOW()), $4, $5, $6) RETURNING *`,
             [source_id, sensor_id, timestamp, value, measurement_type_id, unit_id]
         );
+
+        await client.query('COMMIT');
 
         // Alert real-time connected clients via attached socket
         if (req.io) {
@@ -72,7 +77,10 @@ const createReading = async (req, res) => {
 
         res.status(201).json(newReading.rows[0]);
     } catch (error) {
+        await client.query('ROLLBACK');
         res.status(500).json({ error: error.message });
+    } finally {
+        client.release();
     }
 };
 

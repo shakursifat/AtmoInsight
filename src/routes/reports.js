@@ -5,6 +5,7 @@ const { verifyToken, roleGuard } = require('../middleware/auth');
 
 // POST /api/reports/submit
 router.post('/submit', verifyToken, async (req, res) => {
+    const client = await pool.connect();
     try {
         const { description, location_id, latitude, longitude, location_name } = req.body;
         const user_id = req.user.user_id;
@@ -19,7 +20,7 @@ router.post('/submit', verifyToken, async (req, res) => {
 
         let final_location_id = location_id;
 
-        await pool.query('BEGIN');
+        await client.query('BEGIN');
 
         if (!final_location_id) {
             // Insert a new location
@@ -29,7 +30,7 @@ router.post('/submit', verifyToken, async (req, res) => {
                 VALUES ($1, ST_SetSRID(ST_MakePoint($2, $3), 4326))
                 RETURNING location_id
             `;
-            const locRes = await pool.query(insertLocQuery, [locName, longitude, latitude]);
+            const locRes = await client.query(insertLocQuery, [locName, longitude, latitude]);
             final_location_id = locRes.rows[0].location_id;
         }
 
@@ -38,9 +39,9 @@ router.post('/submit', verifyToken, async (req, res) => {
             VALUES ($1, $2, $3, 1)
             RETURNING report_id, timestamp
         `;
-        const repRes = await pool.query(insertReportQuery, [user_id, description, final_location_id]);
+        const repRes = await client.query(insertReportQuery, [user_id, description, final_location_id]);
         
-        await pool.query('COMMIT');
+        await client.query('COMMIT');
 
         const { report_id, timestamp } = repRes.rows[0];
 
@@ -52,14 +53,16 @@ router.post('/submit', verifyToken, async (req, res) => {
             JOIN reportstatus rs ON ur.status_id = rs.status_id
             WHERE ur.report_id = $1
         `;
-        const finalRes = await pool.query(getReportQuery, [report_id]);
+        const finalRes = await client.query(getReportQuery, [report_id]);
 
         res.status(201).json({ report: finalRes.rows[0] });
 
     } catch (error) {
-        await pool.query('ROLLBACK');
+        await client.query('ROLLBACK');
         console.error('Error submitting report:', error);
         res.status(500).json({ error: 'Failed to submit report' });
+    } finally {
+        client.release();
     }
 });
 
@@ -119,23 +122,31 @@ router.get('/all', [verifyToken, roleGuard(['Admin', 'Scientist'])], async (req,
 
 // PUT /api/reports/:id/status
 router.put('/:id/status', [verifyToken, roleGuard(['Admin', 'Scientist'])], async (req, res) => {
+    const client = await pool.connect();
     try {
         const { id } = req.params;
         const { status_id } = req.body;
 
-        const updated = await pool.query(
+        await client.query('BEGIN');
+
+        const updated = await client.query(
             'UPDATE userreport SET status_id = $1 WHERE report_id = $2 RETURNING *',
             [status_id, id]
         );
 
         if (updated.rows.length === 0) {
+            await client.query('ROLLBACK');
             return res.status(404).json({ error: 'Report not found' });
         }
 
+        await client.query('COMMIT');
         res.json({ message: 'Report status updated', report: updated.rows[0] });
     } catch (error) {
+        await client.query('ROLLBACK');
         console.error('Error updating report status:', error);
         res.status(500).json({ error: 'Failed to update report status' });
+    } finally {
+        client.release();
     }
 });
 

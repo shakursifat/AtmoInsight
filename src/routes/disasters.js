@@ -86,6 +86,7 @@ router.get('/summary', async (req, res) => {
 
 // PATCH /api/disasters/:id/impact
 router.patch('/:id/impact', async (req, res) => {
+    const client = await pool.connect();
     try {
         const eventId = req.params.id;
         const { field, value } = req.body;
@@ -97,6 +98,8 @@ router.patch('/:id/impact', async (req, res) => {
         
         const numValue = value === '' || value === null ? null : Number(value);
 
+        await client.query('BEGIN');
+
         const query = `
             INSERT INTO disasterimpact (event_id, ${field})
             VALUES ($1, $2)
@@ -104,11 +107,16 @@ router.patch('/:id/impact', async (req, res) => {
             DO UPDATE SET ${field} = EXCLUDED.${field}
             RETURNING *;
         `;
-        const result = await pool.query(query, [eventId, numValue]);
+        const result = await client.query(query, [eventId, numValue]);
+        
+        await client.query('COMMIT');
         res.json({ updated: result.rows[0] });
     } catch (err) {
+        await client.query('ROLLBACK');
         console.error(err);
         res.status(500).json({ error: 'Internal server error' });
+    } finally {
+        client.release();
     }
 });
 
