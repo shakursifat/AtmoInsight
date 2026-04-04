@@ -45,6 +45,8 @@ SELECT DISTINCT ON (mt.type_name)
   s.name                                   AS sensor_name,
   l.name                                   AS location_name,
   l.region,
+  ST_Y(l.coordinates)                      AS latitude,
+  ST_X(l.coordinates)                      AS longitude,
   r.timestamp
 FROM reading r
 JOIN sensor s            ON r.sensor_id         = s.sensor_id

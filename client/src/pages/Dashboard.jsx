@@ -97,6 +97,24 @@ export default function Dashboard() {
     [navigate]
   );
 
+  const goToSensorOnMap = useCallback(
+    reading => {
+      const lat = reading.latitude != null ? Number(reading.latitude) : null;
+      const lng = reading.longitude != null ? Number(reading.longitude) : null;
+      const sid = reading.sensor_id;
+      if (lat != null && lng != null && !Number.isNaN(lat) && !Number.isNaN(lng)) {
+        const q = new URLSearchParams({
+          lat: String(lat),
+          lng: String(lng),
+          zoom: '14',
+        });
+        if (sid != null) q.set('sensor', String(sid));
+        navigate(`/?${q.toString()}`);
+      }
+    },
+    [navigate]
+  );
+
   useEffect(() => {
     if (alerts && alerts.length > 0) setLiveAlerts(alerts.slice(0, 8));
   }, [alerts]);
@@ -172,6 +190,7 @@ export default function Dashboard() {
                 unit={c.unit}
                 sublabel={`${c.sensor_name} · ${c.location_name}`}
                 severity={getSeverity(c.measurement, Number(c.value))}
+                onClick={() => goToSensorOnMap(c)}
               />
             ))
           )}
