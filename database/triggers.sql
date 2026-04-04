@@ -71,9 +71,7 @@ BEGIN
         RETURN NEW;
     END IF;
 
-    -- -------------------------------------------------------------------------
-    -- Breach: pick the dominant threshold row (highest max still exceeded)
-    -- -------------------------------------------------------------------------
+    -- Pick dominant threshold row
     SELECT * INTO v_threshold
     FROM alertthreshold
     WHERE measurement_type_id = NEW.measurement_type_id
@@ -93,20 +91,25 @@ BEGIN
         v_severity := 'Critical';
     END IF;
 
-    -- Build a human-readable, categorized alert message
-    v_message := FORMAT(
-        '%s %s sensor reading of %s exceeded safe threshold (limit: %s). Sensor ID: %s.',
-        CASE v_severity
-            WHEN 'Critical' THEN '🚨 CRITICAL'
-            WHEN 'High'     THEN '⚠️ High'
-            WHEN 'Moderate' THEN '⚡ Elevated'
-            ELSE                 'ℹ️ Notice'
-        END,
-        v_mt_name,
-        NEW.value,
-        COALESCE(v_threshold.max_value::text, 'N/A'),
-        NEW.sensor_id
-    );
+    -- Fetch location name and unit symbol for the message
+    DECLARE
+        v_loc_name TEXT;
+        v_unit_sym TEXT;
+    BEGIN
+        SELECT l.name INTO v_loc_name 
+        FROM sensor s JOIN location l ON s.location_id = l.location_id 
+        WHERE s.sensor_id = NEW.sensor_id;
+        
+        SELECT symbol INTO v_unit_sym FROM measurementunit WHERE unit_id = NEW.unit_id;
+
+        v_message := FORMAT(
+            'In %s this %s crossed the max limit %s %s',
+            COALESCE(v_loc_name, 'Unknown'),
+            v_mt_name,
+            COALESCE(v_threshold.max_value::text, v_threshold.min_value::text),
+            COALESCE(v_unit_sym, '')
+        );
+    END;
 
     -- -------------------------------------------------------------------------
     -- Deduplicate: one active alert per (sensor_id, alert_type_id)
