@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import {
   ShieldCheck,
   Radar,
@@ -229,6 +229,16 @@ function NearbySensorsPanel() {
                       )}
                     </div>
                   )}
+                  {s.lat != null && s.lng != null && (
+                    <div className="mt-2 text-right">
+                       <Link
+                         to={`/?lat=${encodeURIComponent(s.lat)}&lng=${encodeURIComponent(s.lng)}&zoom=15&sensor=${encodeURIComponent(s.sensor_id)}`}
+                         className="inline-flex text-[10px] items-center gap-1 font-medium text-data-blue hover:text-accent-gold transition-colors bg-surface-elevated px-2 py-1 rounded border border-border-subtle"
+                       >
+                         View on map
+                       </Link>
+                    </div>
+                  )}
                 </div>
               </div>
             ))
@@ -448,6 +458,216 @@ function ReportsNavCard({ onClick }) {
   );
 }
 
+// ─── Sensor Readings Component ──────────────────────────────────────────────────
+
+function SensorReadings({ sensorId }) {
+  const [readings, setReadings] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+
+  useState(() => {
+    client.get(`/api/readings?sensor_id=${sensorId}&limit=5`)
+      .then(res => setReadings(res.data))
+      .catch(err => setError(err.response?.data?.error || err.message))
+      .finally(() => setLoading(false));
+  }, [sensorId]);
+
+  if (loading) return <div className="text-center py-6 border-t border-border-subtle mt-3"><Loader2 className="w-5 h-5 animate-spin mx-auto text-text-muted" /></div>;
+  if (error) return <div className="text-severity-critical text-xs py-4 text-center border-t border-border-subtle mt-3">{error}</div>;
+  if (!readings?.length) return <div className="text-text-muted text-xs py-4 text-center border-t border-border-subtle mt-3">No recent readings available</div>;
+
+  return (
+    <div className="mt-3 border-t border-border-subtle pt-4">
+      <div className="text-[10px] uppercase font-bold text-text-secondary mb-3 tracking-wider">Latest Readings Snapshot</div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+        {readings.map(r => (
+          <div key={r.reading_id} className="bg-surface-secondary border border-border-subtle rounded-lg px-3 py-2.5 flex flex-col gap-1.5 hover:border-data-blue/30 transition-colors">
+            <div className="flex justify-between items-center">
+              <span className="font-semibold text-text-primary text-xs flex items-center gap-1.5">
+                <Activity className="w-3.5 h-3.5 text-data-blue" /> {r.measurement_type_name}
+              </span>
+              <span className="font-data text-xs font-bold text-data-blue text-right">
+                {r.value} <span className="text-[10px] text-text-muted font-normal ml-0.5">{r.unit_symbol}</span>
+              </span>
+            </div>
+            <div className="text-[9px] text-text-muted flex items-center gap-1 mt-0.5">
+               <Clock className="w-2.5 h-2.5" />
+               {new Date(r.timestamp).toLocaleString()}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ─── Total Sensors Panel ──────────────────────────────────────────────────────
+
+function TotalSensorsPanel() {
+  const [sensors, setSensors] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [deletingId, setDeletingId] = useState(null);
+  const [expandedSensorId, setExpandedSensorId] = useState(null);
+
+  const toggleExpand = (sensorId) => {
+    setExpandedSensorId(prev => prev === sensorId ? null : sensorId);
+  };
+
+  const fetchSensors = useCallback(async () => {
+    setLoading(true);
+    setError('');
+    try {
+      const res = await client.get('/api/sensors');
+      setSensors(res.data || []);
+    } catch (err) {
+      setError(err.response?.data?.error || err.message || 'Failed to load sensors');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  // Fetch sensors on mount
+  useState(() => { fetchSensors(); }, [fetchSensors]);
+
+  const handleDelete = async (sensorId) => {
+    if (!window.confirm('Are you sure you want to delete this sensor? This action cannot be undone.')) return;
+    setDeletingId(sensorId);
+    try {
+      await client.delete(`/api/sensors/${sensorId}`);
+      setSensors(prev => prev.filter(s => s.sensor_id !== sensorId));
+    } catch (err) {
+      alert(err.response?.data?.error || err.message || 'Failed to delete sensor');
+    } finally {
+      setDeletingId(null);
+    }
+  };
+
+  const statusColor = (s) => {
+    if (s === 'Active') return 'text-severity-safe';
+    if (s === 'Maintenance') return 'text-severity-moderate';
+    return 'text-text-muted';
+  };
+
+  const statusDot = (s) => {
+    if (s === 'Active') return 'bg-severity-safe';
+    if (s === 'Maintenance') return 'bg-severity-moderate';
+    return 'bg-text-muted';
+  };
+
+  return (
+    <div className="bg-surface-secondary border border-border-subtle rounded-xl overflow-hidden flex flex-col mt-6">
+      {/* Header */}
+      <div className="px-5 py-4 border-b border-border-subtle flex items-center gap-3 justify-between">
+        <div className="flex items-center gap-3">
+          <div className="w-9 h-9 rounded-lg bg-severity-critical/15 border border-severity-critical/30 flex items-center justify-center shrink-0">
+            <Layers className="w-5 h-5 text-severity-critical" />
+          </div>
+          <div>
+            <h2 className="text-sm font-bold text-text-primary">Total Sensor List</h2>
+            <span className="text-[10px] text-text-muted uppercase tracking-wider">Manage all deployed nodes</span>
+          </div>
+        </div>
+        <button
+          onClick={fetchSensors}
+          disabled={loading}
+          className="p-2 rounded-md hover:bg-surface-elevated text-text-secondary hover:text-text-primary transition-colors disabled:opacity-50"
+          title="Refresh List"
+        >
+          <Activity className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+        </button>
+      </div>
+
+      {/* Error state */}
+      {error && (
+        <div className="m-5 flex items-start gap-2 p-3 rounded-md bg-severity-critical/10 border border-severity-critical/30 text-severity-critical text-xs font-medium">
+          <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
+          <span>{error}</span>
+        </div>
+      )}
+
+      {/* List */}
+      <div className="p-5 overflow-auto" style={{ maxHeight: '500px' }}>
+        {loading && sensors.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-10 gap-2">
+            <Loader2 className="w-6 h-6 animate-spin text-text-muted" />
+            <span className="text-sm text-text-muted">Loading sensors...</span>
+          </div>
+        ) : sensors.length === 0 ? (
+          <div className="text-center py-8 text-text-muted text-sm">No sensors deployed yet.</div>
+        ) : (
+          <div className="flex flex-col gap-3">
+            {sensors.map(s => (
+              <div
+                key={s.sensor_id}
+                className="bg-surface-primary rounded-lg border border-border-subtle px-4 py-3 flex flex-col group hover:border-text-muted transition-colors cursor-pointer"
+                onClick={() => toggleExpand(s.sensor_id)}
+              >
+                <div className="flex items-center justify-between gap-4">
+                  <div className="flex items-center gap-3 flex-1 min-w-0">
+                    <div className={`w-2 h-2 rounded-full shrink-0 ${statusDot(s.status)}`} />
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-bold text-text-primary truncate">{s.name}</span>
+                        <span className="text-[10px] text-text-muted border border-border-subtle rounded px-1.5 py-0.5">ID: {s.sensor_id}</span>
+                      </div>
+                      <div className="flex gap-4 mt-1 flex-wrap items-center">
+                        <span className="text-[11px] text-text-muted flex items-center gap-1">
+                          <MapPin className="w-3 h-3" />{s.location_name}
+                        </span>
+                        <span className="text-[11px] text-text-muted flex items-center gap-1">
+                          <Activity className="w-3 h-3" />{s.type_name}
+                        </span>
+                        {s.lat != null && s.lng != null && (
+                          <Link
+                            to={`/?lat=${encodeURIComponent(s.lat)}&lng=${encodeURIComponent(s.lng)}&zoom=15&sensor=${encodeURIComponent(s.sensor_id)}`}
+                            className="ml-auto inline-flex text-[10px] font-medium text-data-blue hover:text-accent-gold transition-colors border border-border-subtle rounded px-2 py-1 bg-surface-elevated"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            View on map
+                          </Link>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div className="flex items-center gap-4">
+                    <span className={`text-xs font-medium font-data hidden sm:block ${statusColor(s.status)}`}>
+                      {s.status}
+                    </span>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); handleDelete(s.sensor_id); }}
+                      disabled={deletingId === s.sensor_id}
+                      className="flex flex-row items-center gap-1.5 px-3 py-1.5 rounded-md hover:bg-severity-critical/10 text-text-secondary hover:text-severity-critical transition-colors disabled:opacity-50 border border-transparent hover:border-severity-critical/30"
+                      title="Delete Sensor"
+                    >
+                      {deletingId === s.sensor_id ? (
+                        <Loader2 className="w-4 h-4 animate-spin shrink-0" />
+                      ) : (
+                        <X className="w-4 h-4 shrink-0" />
+                      )}
+                      <span className="text-xs font-semibold hidden md:block">
+                        {deletingId === s.sensor_id ? 'Deleting...' : 'Delete'}
+                      </span>
+                    </button>
+                    <ChevronRight className={`w-4 h-4 text-text-muted transition-transform ${expandedSensorId === s.sensor_id ? 'rotate-90' : ''}`} />
+                  </div>
+                </div>
+
+                {expandedSensorId === s.sensor_id && (
+                  <div onClick={(e) => e.stopPropagation()}>
+                    <SensorReadings sensorId={s.sensor_id} />
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
 export default function AdminControlPanel() {
@@ -497,6 +717,9 @@ export default function AdminControlPanel() {
           <NearbySensorsPanel />
           <AddSensorPanel />
         </div>
+
+        {/* Total Sensors List (full width) */}
+        <TotalSensorsPanel />
 
       </div>
     </div>

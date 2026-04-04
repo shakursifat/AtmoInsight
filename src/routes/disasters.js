@@ -3,11 +3,22 @@ const router = express.Router();
 const pool = require('../db/pool');
 
 // GET /api/disasters
-// Accepts optional ?limit=N (default 100, max 500) and ?offset=N for pagination
+// Accepts optional ?limit=N (default 500, max 1000), ?offset=N for pagination, and ?subgroup=
 router.get('/', async (req, res) => {
     try {
-        const limit  = Math.min(parseInt(req.query.limit)  || 100, 500);
+        const limit  = Math.min(parseInt(req.query.limit)  || 500, 1000);
         const offset = Math.max(parseInt(req.query.offset) || 0,   0);
+        const subgroup = req.query.subgroup;
+
+        let conditions = [];
+        let params = [];
+        
+        if (subgroup) {
+            conditions.push(`ds.subgroup_name ILIKE $${params.length + 1}`);
+            params.push(subgroup);
+        }
+
+        const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
 
         const query = `
             SELECT 
@@ -31,10 +42,13 @@ router.get('/', async (req, res) => {
             JOIN disastersubgroup ds ON dt.subgroup_id = ds.subgroup_id
             JOIN location l ON d.location_id = l.location_id
             LEFT JOIN disasterimpact di ON d.event_id = di.event_id
+            ${whereClause}
             ORDER BY d.start_timestamp DESC
-            LIMIT $1 OFFSET $2
+            LIMIT $${params.length + 1} OFFSET $${params.length + 2}
         `;
-        const result = await pool.query(query, [limit, offset]);
+        params.push(limit, offset);
+
+        const result = await pool.query(query, params);
         res.json({ disasters: result.rows, limit, offset });
     } catch (err) {
         console.error(err);
@@ -64,6 +78,34 @@ router.get('/summary', async (req, res) => {
             [subgroup, year]
         );
         res.json({ summary: result.rows });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
+// PATCH /api/disasters/:id/impact
+router.patch('/:id/impact', async (req, res) => {
+    try {
+        const eventId = req.params.id;
+        const { field, value } = req.body;
+        
+        const validFields = ['deaths', 'injuries', 'affected_people', 'economic_loss'];
+        if (!validFields.includes(field)) {
+            return res.status(400).json({ error: 'Invalid field' });
+        }
+        
+        const numValue = value === '' || value === null ? null : Number(value);
+
+        const query = `
+            INSERT INTO disasterimpact (event_id, ${field})
+            VALUES ($1, $2)
+            ON CONFLICT (event_id)
+            DO UPDATE SET ${field} = EXCLUDED.${field}
+            RETURNING *;
+        `;
+        const result = await pool.query(query, [eventId, numValue]);
+        res.json({ updated: result.rows[0] });
     } catch (err) {
         console.error(err);
         res.status(500).json({ error: 'Internal server error' });

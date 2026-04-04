@@ -151,7 +151,7 @@ CREATE TABLE DisasterEvent (
 
 CREATE TABLE DisasterImpact (
     impact_id SERIAL PRIMARY KEY,
-    event_id INTEGER REFERENCES DisasterEvent(event_id),
+    event_id INTEGER UNIQUE REFERENCES DisasterEvent(event_id),
     deaths INTEGER,
     injuries INTEGER,
     economic_loss NUMERIC,

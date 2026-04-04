@@ -61,8 +61,12 @@ export function useActiveAlerts() {
   return { alerts: data?.alerts || [], loading, error, refetch };
 }
 
-export function useDisasters() {
-  const { data, loading, error, refetch } = useFetch('/api/disasters');
+export function useDisasters(subgroup = 'All') {
+  const params = { limit: 500 };
+  if (subgroup && subgroup !== 'All') {
+    params.subgroup = subgroup;
+  }
+  const { data, loading, error, refetch } = useFetch('/api/disasters', params);
   return { disasters: data?.disasters || [], loading, error, refetch };
 }
 

@@ -375,6 +375,39 @@ $$;
 
 
 -- =============================================================================
+-- PROCEDURE 7: delete_sensor
+-- Deletes a sensor and its associated readings and alerts.
+--
+-- Parameters:
+--   p_sensor_id INTEGER — sensor to delete
+--
+-- Example:
+--   CALL delete_sensor(45);
+-- =============================================================================
+
+CREATE OR REPLACE PROCEDURE delete_sensor(
+    IN p_sensor_id INTEGER
+)
+LANGUAGE plpgsql
+AS $$
+BEGIN
+    -- 1. Delete associated alerts (via reading_id)
+    DELETE FROM alert WHERE reading_id IN (
+        SELECT reading_id FROM reading WHERE sensor_id = p_sensor_id
+    );
+
+    -- 2. Delete associated readings
+    DELETE FROM reading WHERE sensor_id = p_sensor_id;
+
+    -- 3. Delete the sensor itself
+    DELETE FROM sensor WHERE sensor_id = p_sensor_id;
+    
+    RAISE NOTICE 'Deleted sensor % and its associated readings/alerts', p_sensor_id;
+END;
+$$;
+
+
+-- =============================================================================
 -- Quick-test calls (run each block in psql or a transaction-aware client)
 -- =============================================================================
 

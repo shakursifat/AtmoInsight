@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { getSensors, getSensorTypes, getLocations, createSensor, getNearbySensors } = require('../controllers/sensorsController');
+const { getSensors, getSensorTypes, getLocations, createSensor, getNearbySensors, deleteSensor } = require('../controllers/sensorsController');
 const { verifyToken, verifyAdmin } = require('../middleware/authMiddleware');
 
 // GET /api/sensors - list sensors with optional filters
@@ -18,5 +18,8 @@ router.get('/nearby', verifyToken, verifyAdmin, getNearbySensors);
 
 // POST /api/sensors - create a new sensor (admin only)
 router.post('/', verifyToken, verifyAdmin, createSensor);
+
+// DELETE /api/sensors/:id - delete a sensor (admin only)
+router.delete('/:id', verifyToken, verifyAdmin, deleteSensor);
 
 module.exports = router;

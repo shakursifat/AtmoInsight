@@ -1,1 +1,2 @@
-select * from alerttype
+SELECT name
+from sensor
