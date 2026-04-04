@@ -97,6 +97,7 @@ export default function Login() {
             </div>
           )}
 
+          {/* 
           {!isLogin && (
             <div className="flex flex-col gap-2">
               <label className="text-[11px] uppercase tracking-wider text-text-secondary font-semibold">Account Role</label>
@@ -112,6 +113,8 @@ export default function Login() {
               </select>
             </div>
           )}
+          */}
+
 
           <div className="flex flex-col gap-2">
             <label className="text-[11px] uppercase tracking-wider text-text-secondary font-semibold">Email Address</label>
