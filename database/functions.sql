@@ -20,61 +20,61 @@
 --   SELECT * FROM get_pollution_average(1, 'PM2.5', INTERVAL '30 days');
 -- =============================================================================
 
-CREATE OR REPLACE FUNCTION get_pollution_average(
-    p_location_id           INTEGER,
-    p_measurement_type_name TEXT,
-    p_interval              INTERVAL DEFAULT INTERVAL '7 days'
-)
-RETURNS TABLE (
-    location_name   TEXT,
-    measurement     TEXT,
-    unit_symbol     TEXT,
-    avg_value       NUMERIC,
-    min_value       NUMERIC,
-    max_value       NUMERIC,
-    reading_count   BIGINT,
-    from_time       TIMESTAMPTZ,
-    to_time         TIMESTAMPTZ
-)
-LANGUAGE plpgsql
-STABLE
-AS $$
-BEGIN
-    RETURN QUERY
-    SELECT
-        l.name::TEXT                              AS location_name,
-        mt.type_name::TEXT                        AS measurement,
-        mu.symbol::TEXT                           AS unit_symbol,
-        ROUND(AVG(r.value)::numeric,  2)          AS avg_value,
-        ROUND(MIN(r.value)::numeric,  2)          AS min_value,
-        ROUND(MAX(r.value)::numeric,  2)          AS max_value,
-        COUNT(*)                                  AS reading_count,
-        (NOW() - p_interval)                      AS from_time,
-        NOW()                                     AS to_time
-    FROM reading          r
-    JOIN sensor           s  ON r.sensor_id            = s.sensor_id
-    JOIN location         l  ON s.location_id          = l.location_id
-    JOIN measurementtype  mt ON r.measurement_type_id  = mt.measurement_type_id
-    JOIN measurementunit  mu ON r.unit_id              = mu.unit_id
-    WHERE l.location_id    = p_location_id
-      AND mt.type_name     = p_measurement_type_name
-      AND r.timestamp     >= NOW() - p_interval
-    GROUP BY l.name, mt.type_name, mu.symbol;
+-- CREATE OR REPLACE FUNCTION get_pollution_average(
+--     p_location_id           INTEGER,
+--     p_measurement_type_name TEXT,
+--     p_interval              INTERVAL DEFAULT INTERVAL '7 days'
+-- )
+-- RETURNS TABLE (
+--     location_name   TEXT,
+--     measurement     TEXT,
+--     unit_symbol     TEXT,
+--     avg_value       NUMERIC,
+--     min_value       NUMERIC,
+--     max_value       NUMERIC,
+--     reading_count   BIGINT,
+--     from_time       TIMESTAMPTZ,
+--     to_time         TIMESTAMPTZ
+-- )
+-- LANGUAGE plpgsql
+-- STABLE
+-- AS $$
+-- BEGIN
+--     RETURN QUERY
+--     SELECT
+--         l.name::TEXT                              AS location_name,
+--         mt.type_name::TEXT                        AS measurement,
+--         mu.symbol::TEXT                           AS unit_symbol,
+--         ROUND(AVG(r.value)::numeric,  2)          AS avg_value,
+--         ROUND(MIN(r.value)::numeric,  2)          AS min_value,
+--         ROUND(MAX(r.value)::numeric,  2)          AS max_value,
+--         COUNT(*)                                  AS reading_count,
+--         (NOW() - p_interval)                      AS from_time,
+--         NOW()                                     AS to_time
+--     FROM reading          r
+--     JOIN sensor           s  ON r.sensor_id            = s.sensor_id
+--     JOIN location         l  ON s.location_id          = l.location_id
+--     JOIN measurementtype  mt ON r.measurement_type_id  = mt.measurement_type_id
+--     JOIN measurementunit  mu ON r.unit_id              = mu.unit_id
+--     WHERE l.location_id    = p_location_id
+--       AND mt.type_name     = p_measurement_type_name
+--       AND r.timestamp     >= NOW() - p_interval
+--     GROUP BY l.name, mt.type_name, mu.symbol;
 
-    -- Return empty row with nulls if no data found (better than silent empty set)
-    IF NOT FOUND THEN
-        RETURN QUERY
-        SELECT
-            (SELECT name FROM location WHERE location_id = p_location_id)::TEXT,
-            p_measurement_type_name::TEXT,
-            NULL::TEXT,
-            NULL::NUMERIC, NULL::NUMERIC, NULL::NUMERIC,
-            0::BIGINT,
-            NOW() - p_interval,
-            NOW();
-    END IF;
-END;
-$$;
+--     -- Return empty row with nulls if no data found (better than silent empty set)
+--     IF NOT FOUND THEN
+--         RETURN QUERY
+--         SELECT
+--             (SELECT name FROM location WHERE location_id = p_location_id)::TEXT,
+--             p_measurement_type_name::TEXT,
+--             NULL::TEXT,
+--             NULL::NUMERIC, NULL::NUMERIC, NULL::NUMERIC,
+--             0::BIGINT,
+--             NOW() - p_interval,
+--             NOW();
+--     END IF;
+-- END;
+-- $$;
 
 
 -- =============================================================================
@@ -155,69 +155,69 @@ $$;
 --   SELECT * FROM get_nearby_sensors(90.4074, 23.7104, 15000, 'PM2.5');
 -- =============================================================================
 
-CREATE OR REPLACE PROCEDURE get_nearby_sensors(
-    p_longitude     FLOAT8,
-    p_latitude      FLOAT8,
-    p_radius_metres FLOAT8 DEFAULT 10000,
-    p_measurement   TEXT   DEFAULT NULL,
-    OUT result_cursor REFCURSOR
-)
-LANGUAGE plpgsql
-AS $$
-DECLARE
-    v_ref_point GEOMETRY := ST_SetSRID(ST_MakePoint(p_longitude, p_latitude), 4326);
-BEGIN
-    OPEN result_cursor FOR
-    SELECT
-        s.sensor_id,
-        s.name::TEXT                                                     AS sensor_name,
-        st.type_name::TEXT                                               AS sensor_type,
-        l.name::TEXT                                                     AS location_name,
-        ROUND(
-            ST_Distance(l.coordinates::geography, v_ref_point::geography)::numeric,
-            1
-        )                                                                AS distance_metres,
-        s.status::TEXT,
-        -- Latest reading for the requested measurement type (subquery)
-        (
-            SELECT ROUND(r.value::numeric, 2)
-            FROM reading r
-            JOIN measurementtype mt ON r.measurement_type_id = mt.measurement_type_id
-            WHERE r.sensor_id = s.sensor_id
-              AND (p_measurement IS NULL OR mt.type_name = p_measurement)
-            ORDER BY r.timestamp DESC
-            LIMIT 1
-        )                                                                AS latest_value,
-        (
-            SELECT mu.symbol::TEXT
-            FROM reading r
-            JOIN measurementunit mu ON r.unit_id = mu.unit_id
-            JOIN measurementtype mt ON r.measurement_type_id = mt.measurement_type_id
-            WHERE r.sensor_id = s.sensor_id
-              AND (p_measurement IS NULL OR mt.type_name = p_measurement)
-            ORDER BY r.timestamp DESC
-            LIMIT 1
-        )                                                                AS latest_unit,
-        (
-            SELECT r.timestamp
-            FROM reading r
-            JOIN measurementtype mt ON r.measurement_type_id = mt.measurement_type_id
-            WHERE r.sensor_id = s.sensor_id
-              AND (p_measurement IS NULL OR mt.type_name = p_measurement)
-            ORDER BY r.timestamp DESC
-            LIMIT 1
-        )                                                                AS latest_timestamp
-    FROM sensor     s
-    JOIN sensortype st ON s.sensor_type_id = st.sensor_type_id
-    JOIN location   l  ON s.location_id    = l.location_id
-    WHERE ST_DWithin(
-        l.coordinates::geography,
-        v_ref_point::geography,
-        p_radius_metres
-    )
-    ORDER BY distance_metres;
-END;
-$$;
+-- CREATE OR REPLACE PROCEDURE get_nearby_sensors(
+--     p_longitude     FLOAT8,
+--     p_latitude      FLOAT8,
+--     p_radius_metres FLOAT8 DEFAULT 10000,
+--     p_measurement   TEXT   DEFAULT NULL,
+--     OUT result_cursor REFCURSOR
+-- )
+-- LANGUAGE plpgsql
+-- AS $$
+-- DECLARE
+--     v_ref_point GEOMETRY := ST_SetSRID(ST_MakePoint(p_longitude, p_latitude), 4326);
+-- BEGIN
+--     OPEN result_cursor FOR
+--     SELECT
+--         s.sensor_id,
+--         s.name::TEXT                                                     AS sensor_name,
+--         st.type_name::TEXT                                               AS sensor_type,
+--         l.name::TEXT                                                     AS location_name,
+--         ROUND(
+--             ST_Distance(l.coordinates::geography, v_ref_point::geography)::numeric,
+--             1
+--         )                                                                AS distance_metres,
+--         s.status::TEXT,
+--         -- Latest reading for the requested measurement type (subquery)
+--         (
+--             SELECT ROUND(r.value::numeric, 2)
+--             FROM reading r
+--             JOIN measurementtype mt ON r.measurement_type_id = mt.measurement_type_id
+--             WHERE r.sensor_id = s.sensor_id
+--               AND (p_measurement IS NULL OR mt.type_name = p_measurement)
+--             ORDER BY r.timestamp DESC
+--             LIMIT 1
+--         )                                                                AS latest_value,
+--         (
+--             SELECT mu.symbol::TEXT
+--             FROM reading r
+--             JOIN measurementunit mu ON r.unit_id = mu.unit_id
+--             JOIN measurementtype mt ON r.measurement_type_id = mt.measurement_type_id
+--             WHERE r.sensor_id = s.sensor_id
+--               AND (p_measurement IS NULL OR mt.type_name = p_measurement)
+--             ORDER BY r.timestamp DESC
+--             LIMIT 1
+--         )                                                                AS latest_unit,
+--         (
+--             SELECT r.timestamp
+--             FROM reading r
+--             JOIN measurementtype mt ON r.measurement_type_id = mt.measurement_type_id
+--             WHERE r.sensor_id = s.sensor_id
+--               AND (p_measurement IS NULL OR mt.type_name = p_measurement)
+--             ORDER BY r.timestamp DESC
+--             LIMIT 1
+--         )                                                                AS latest_timestamp
+--     FROM sensor     s
+--     JOIN sensortype st ON s.sensor_type_id = st.sensor_type_id
+--     JOIN location   l  ON s.location_id    = l.location_id
+--     WHERE ST_DWithin(
+--         l.coordinates::geography,
+--         v_ref_point::geography,
+--         p_radius_metres
+--     )
+--     ORDER BY distance_metres;
+-- END;
+-- $$;
 
 
 -- =============================================================================

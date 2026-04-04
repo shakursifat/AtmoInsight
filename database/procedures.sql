@@ -20,6 +20,27 @@
 -- =============================================================================
 
 
+    CREATE OR REPLACE PROCEDURE delete_sensor(
+    IN p_sensor_id INTEGER
+)
+LANGUAGE plpgsql
+AS $$
+BEGIN
+    -- 1. Delete associated alerts (via reading_id)
+    DELETE FROM alert WHERE reading_id IN (
+        SELECT reading_id FROM reading WHERE sensor_id = p_sensor_id
+    );
+
+    -- 2. Delete associated readings
+    DELETE FROM reading WHERE sensor_id = p_sensor_id;
+
+    -- 3. Delete the sensor itself
+    DELETE FROM sensor WHERE sensor_id = p_sensor_id;
+    
+    RAISE NOTICE 'Deleted sensor % and its associated readings/alerts', p_sensor_id;
+END;
+$$;
+
 -- =============================================================================
 -- PROCEDURE 1: get_sensor_reading_avg
 -- Returns the statistical summary (avg / min / max / count / unit) for a
@@ -38,37 +59,37 @@
 --   COMMIT;
 -- =============================================================================
 
-CREATE OR REPLACE PROCEDURE get_sensor_reading_avg(
-    IN  p_sensor_id    INTEGER,
-    IN  p_interval     INTERVAL DEFAULT INTERVAL '30 days',
-    OUT result_cursor  REFCURSOR
-)
-LANGUAGE plpgsql
-AS $$
-BEGIN
-    OPEN result_cursor FOR
-    SELECT
-        s.name::TEXT                              AS sensor_name,
-        l.name::TEXT                              AS location_name,
-        mt.type_name::TEXT                        AS measurement_type,
-        mu.symbol::TEXT                           AS unit_symbol,
-        ROUND(AVG(r.value)::numeric, 2)           AS avg_value,
-        ROUND(MIN(r.value)::numeric, 2)           AS min_value,
-        ROUND(MAX(r.value)::numeric, 2)           AS max_value,
-        COUNT(*)::BIGINT                          AS reading_count,
-        (NOW() - p_interval)                      AS from_time,
-        NOW()                                     AS to_time
-    FROM reading          r
-    JOIN sensor           s  ON r.sensor_id           = s.sensor_id
-    JOIN location         l  ON s.location_id         = l.location_id
-    JOIN measurementtype  mt ON r.measurement_type_id = mt.measurement_type_id
-    JOIN measurementunit  mu ON r.unit_id             = mu.unit_id
-    WHERE s.sensor_id  = p_sensor_id
-      AND r.timestamp >= NOW() - p_interval
-    GROUP BY s.name, l.name, mt.type_name, mu.symbol
-    ORDER BY reading_count DESC;
-END;
-$$;
+-- CREATE OR REPLACE PROCEDURE get_sensor_reading_avg(
+--     IN  p_sensor_id    INTEGER,
+--     IN  p_interval     INTERVAL DEFAULT INTERVAL '30 days',
+--     OUT result_cursor  REFCURSOR
+-- )
+-- LANGUAGE plpgsql
+-- AS $$
+-- BEGIN
+--     OPEN result_cursor FOR
+--     SELECT
+--         s.name::TEXT                              AS sensor_name,
+--         l.name::TEXT                              AS location_name,
+--         mt.type_name::TEXT                        AS measurement_type,
+--         mu.symbol::TEXT                           AS unit_symbol,
+--         ROUND(AVG(r.value)::numeric, 2)           AS avg_value,
+--         ROUND(MIN(r.value)::numeric, 2)           AS min_value,
+--         ROUND(MAX(r.value)::numeric, 2)           AS max_value,
+--         COUNT(*)::BIGINT                          AS reading_count,
+--         (NOW() - p_interval)                      AS from_time,
+--         NOW()                                     AS to_time
+--     FROM reading          r
+--     JOIN sensor           s  ON r.sensor_id           = s.sensor_id
+--     JOIN location         l  ON s.location_id         = l.location_id
+--     JOIN measurementtype  mt ON r.measurement_type_id = mt.measurement_type_id
+--     JOIN measurementunit  mu ON r.unit_id             = mu.unit_id
+--     WHERE s.sensor_id  = p_sensor_id
+--       AND r.timestamp >= NOW() - p_interval
+--     GROUP BY s.name, l.name, mt.type_name, mu.symbol
+--     ORDER BY reading_count DESC;
+-- END;
+-- $$;
 
 
 -- =============================================================================
@@ -90,58 +111,58 @@ $$;
 --   COMMIT;
 -- =============================================================================
 
-CREATE OR REPLACE PROCEDURE get_location_pollution_report(
-    IN  p_location_id  INTEGER,
-    IN  p_interval     INTERVAL DEFAULT INTERVAL '30 days',
-    OUT result_cursor  REFCURSOR
-)
-LANGUAGE plpgsql
-AS $$
-BEGIN
-    OPEN result_cursor FOR
-    SELECT
-        l.name::TEXT                              AS location_name,
-        mt.type_name::TEXT                        AS measurement_type,
-        mu.symbol::TEXT                           AS unit_symbol,
-        ROUND(AVG(r.value)::numeric, 2)           AS avg_value,
-        ROUND(MIN(r.value)::numeric, 2)           AS min_value,
-        ROUND(MAX(r.value)::numeric, 2)           AS max_value,
-        COUNT(*)::BIGINT                          AS reading_count,
-        -- Configured max threshold for this measurement type (if any)
-        (SELECT MAX(at2.max_value)
-         FROM alertthreshold at2
-         WHERE at2.measurement_type_id = mt.measurement_type_id
-           AND at2.max_value IS NOT NULL)         AS threshold_max,
-        -- Whether the period average exceeds the threshold
-        COALESCE(
-            ROUND(AVG(r.value)::numeric, 2) >
-            (SELECT MAX(at3.max_value)
-             FROM alertthreshold at3
-             WHERE at3.measurement_type_id = mt.measurement_type_id
-               AND at3.max_value IS NOT NULL),
-            false
-        )                                         AS is_exceeding,
-        -- Human-readable severity from the threshold table
-        COALESCE(
-            (SELECT at4.severity
-             FROM alertthreshold at4
-             WHERE at4.measurement_type_id = mt.measurement_type_id
-               AND at4.max_value IS NOT NULL
-             ORDER BY at4.max_value DESC
-             LIMIT 1),
-            'Normal'
-        )                                         AS severity_label
-    FROM reading          r
-    JOIN sensor           s  ON r.sensor_id           = s.sensor_id
-    JOIN location         l  ON s.location_id         = l.location_id
-    JOIN measurementtype  mt ON r.measurement_type_id = mt.measurement_type_id
-    JOIN measurementunit  mu ON r.unit_id             = mu.unit_id
-    WHERE l.location_id = p_location_id
-      AND r.timestamp  >= NOW() - p_interval
-    GROUP BY l.name, mt.type_name, mu.symbol, mt.measurement_type_id
-    ORDER BY avg_value DESC;
-END;
-$$;
+-- CREATE OR REPLACE PROCEDURE get_location_pollution_report(
+--     IN  p_location_id  INTEGER,
+--     IN  p_interval     INTERVAL DEFAULT INTERVAL '30 days',
+--     OUT result_cursor  REFCURSOR
+-- )
+-- LANGUAGE plpgsql
+-- AS $$
+-- BEGIN
+--     OPEN result_cursor FOR
+--     SELECT
+--         l.name::TEXT                              AS location_name,
+--         mt.type_name::TEXT                        AS measurement_type,
+--         mu.symbol::TEXT                           AS unit_symbol,
+--         ROUND(AVG(r.value)::numeric, 2)           AS avg_value,
+--         ROUND(MIN(r.value)::numeric, 2)           AS min_value,
+--         ROUND(MAX(r.value)::numeric, 2)           AS max_value,
+--         COUNT(*)::BIGINT                          AS reading_count,
+--         -- Configured max threshold for this measurement type (if any)
+--         (SELECT MAX(at2.max_value)
+--          FROM alertthreshold at2
+--          WHERE at2.measurement_type_id = mt.measurement_type_id
+--            AND at2.max_value IS NOT NULL)         AS threshold_max,
+--         -- Whether the period average exceeds the threshold
+--         COALESCE(
+--             ROUND(AVG(r.value)::numeric, 2) >
+--             (SELECT MAX(at3.max_value)
+--              FROM alertthreshold at3
+--              WHERE at3.measurement_type_id = mt.measurement_type_id
+--                AND at3.max_value IS NOT NULL),
+--             false
+--         )                                         AS is_exceeding,
+--         -- Human-readable severity from the threshold table
+--         COALESCE(
+--             (SELECT at4.severity
+--              FROM alertthreshold at4
+--              WHERE at4.measurement_type_id = mt.measurement_type_id
+--                AND at4.max_value IS NOT NULL
+--              ORDER BY at4.max_value DESC
+--              LIMIT 1),
+--             'Normal'
+--         )                                         AS severity_label
+--     FROM reading          r
+--     JOIN sensor           s  ON r.sensor_id           = s.sensor_id
+--     JOIN location         l  ON s.location_id         = l.location_id
+--     JOIN measurementtype  mt ON r.measurement_type_id = mt.measurement_type_id
+--     JOIN measurementunit  mu ON r.unit_id             = mu.unit_id
+--     WHERE l.location_id = p_location_id
+--       AND r.timestamp  >= NOW() - p_interval
+--     GROUP BY l.name, mt.type_name, mu.symbol, mt.measurement_type_id
+--     ORDER BY avg_value DESC;
+-- END;
+-- $$;
 
 
 -- =============================================================================
@@ -165,33 +186,33 @@ $$;
 --   COMMIT;
 -- =============================================================================
 
-CREATE OR REPLACE PROCEDURE get_daily_graph_data(
-    IN  p_sensor_id    INTEGER,
-    IN  p_type         TEXT,
-    IN  p_days         INTEGER DEFAULT 30,
-    OUT result_cursor  REFCURSOR
-)
-LANGUAGE plpgsql
-AS $$
-BEGIN
-    OPEN result_cursor FOR
-    SELECT
-        DATE_TRUNC('day', r.timestamp)::DATE      AS chart_date,
-        ROUND(AVG(r.value)::numeric, 2)           AS avg_value,
-        ROUND(MIN(r.value)::numeric, 2)           AS min_value,
-        ROUND(MAX(r.value)::numeric, 2)           AS max_value,
-        COUNT(*)::BIGINT                          AS reading_count,
-        MAX(mu.symbol)::TEXT                      AS unit_symbol
-    FROM reading          r
-    JOIN measurementtype  mt ON r.measurement_type_id = mt.measurement_type_id
-    JOIN measurementunit  mu ON r.unit_id             = mu.unit_id
-    WHERE r.sensor_id   = p_sensor_id
-      AND mt.type_name  = p_type
-      AND r.timestamp  >= NOW() - (p_days || ' days')::INTERVAL
-    GROUP BY DATE_TRUNC('day', r.timestamp)
-    ORDER BY chart_date ASC;
-END;
-$$;
+-- CREATE OR REPLACE PROCEDURE get_daily_graph_data(
+--     IN  p_sensor_id    INTEGER,
+--     IN  p_type         TEXT,
+--     IN  p_days         INTEGER DEFAULT 30,
+--     OUT result_cursor  REFCURSOR
+-- )
+-- LANGUAGE plpgsql
+-- AS $$
+-- BEGIN
+--     OPEN result_cursor FOR
+--     SELECT
+--         DATE_TRUNC('day', r.timestamp)::DATE      AS chart_date,
+--         ROUND(AVG(r.value)::numeric, 2)           AS avg_value,
+--         ROUND(MIN(r.value)::numeric, 2)           AS min_value,
+--         ROUND(MAX(r.value)::numeric, 2)           AS max_value,
+--         COUNT(*)::BIGINT                          AS reading_count,
+--         MAX(mu.symbol)::TEXT                      AS unit_symbol
+--     FROM reading          r
+--     JOIN measurementtype  mt ON r.measurement_type_id = mt.measurement_type_id
+--     JOIN measurementunit  mu ON r.unit_id             = mu.unit_id
+--     WHERE r.sensor_id   = p_sensor_id
+--       AND mt.type_name  = p_type
+--       AND r.timestamp  >= NOW() - (p_days || ' days')::INTERVAL
+--     GROUP BY DATE_TRUNC('day', r.timestamp)
+--     ORDER BY chart_date ASC;
+-- END;
+-- $$;
 
 
 -- =============================================================================
@@ -210,42 +231,42 @@ $$;
 --   CALL purge_old_readings(INTERVAL '6 months', true, NULL);  -- dry-run
 -- =============================================================================
 
-CREATE OR REPLACE PROCEDURE purge_old_readings(
-    IN  p_older_than  INTERVAL,
-    IN  p_dry_run     BOOLEAN DEFAULT FALSE,
-    OUT rows_deleted  BIGINT
-)
-LANGUAGE plpgsql
-AS $$
-DECLARE
-    v_cutoff  TIMESTAMPTZ := NOW() - p_older_than;
-BEGIN
-    IF p_dry_run THEN
-        SELECT COUNT(*) INTO rows_deleted
-        FROM reading
-        WHERE timestamp < v_cutoff;
+-- CREATE OR REPLACE PROCEDURE purge_old_readings(
+--     IN  p_older_than  INTERVAL,
+--     IN  p_dry_run     BOOLEAN DEFAULT FALSE,
+--     OUT rows_deleted  BIGINT
+-- )
+-- LANGUAGE plpgsql
+-- AS $$
+-- DECLARE
+--     v_cutoff  TIMESTAMPTZ := NOW() - p_older_than;
+-- BEGIN
+--     IF p_dry_run THEN
+--         SELECT COUNT(*) INTO rows_deleted
+--         FROM reading
+--         WHERE timestamp < v_cutoff;
 
-        RAISE NOTICE '[purge_old_readings] DRY-RUN: would delete % rows older than % (%)',
-            rows_deleted, p_older_than, v_cutoff;
-    ELSE
-        -- Remove referencing alerts first (FK constraint)
-        DELETE FROM alert
-        WHERE reading_id IN (
-            SELECT reading_id FROM reading WHERE timestamp < v_cutoff
-        );
+--         RAISE NOTICE '[purge_old_readings] DRY-RUN: would delete % rows older than % (%)',
+--             rows_deleted, p_older_than, v_cutoff;
+--     ELSE
+--         -- Remove referencing alerts first (FK constraint)
+--         DELETE FROM alert
+--         WHERE reading_id IN (
+--             SELECT reading_id FROM reading WHERE timestamp < v_cutoff
+--         );
 
-        WITH deleted AS (
-            DELETE FROM reading
-            WHERE timestamp < v_cutoff
-            RETURNING reading_id
-        )
-        SELECT COUNT(*) INTO rows_deleted FROM deleted;
+--         WITH deleted AS (
+--             DELETE FROM reading
+--             WHERE timestamp < v_cutoff
+--             RETURNING reading_id
+--         )
+--         SELECT COUNT(*) INTO rows_deleted FROM deleted;
 
-        RAISE NOTICE '[purge_old_readings] Deleted % readings older than % (%)',
-            rows_deleted, p_older_than, v_cutoff;
-    END IF;
-END;
-$$;
+--         RAISE NOTICE '[purge_old_readings] Deleted % readings older than % (%)',
+--             rows_deleted, p_older_than, v_cutoff;
+--     END IF;
+-- END;
+-- $$;
 
 
 -- =============================================================================
@@ -260,57 +281,57 @@ $$;
 --   CALL refresh_climate_indicators();
 -- =============================================================================
 
-CREATE OR REPLACE PROCEDURE refresh_climate_indicators()
-LANGUAGE plpgsql
-AS $$
-DECLARE
-    v_rec           RECORD;
-    v_existing_id   INTEGER;
-    v_count         INTEGER := 0;
-BEGIN
-    FOR v_rec IN
-        SELECT
-            ha.measurement_type_id,
-            mt.type_name,
-            ROUND(AVG(ha.avg_value)::numeric, 4)  AS overall_avg,
-            (SELECT agg_id
-             FROM historicalaggregation ha2
-             WHERE ha2.measurement_type_id = ha.measurement_type_id
-             ORDER BY lower(ha2.timestamp_range) DESC
-             LIMIT 1)                              AS latest_agg_id
-        FROM historicalaggregation ha
-        JOIN measurementtype mt ON ha.measurement_type_id = mt.measurement_type_id
-        GROUP BY ha.measurement_type_id, mt.type_name
-    LOOP
-        SELECT ci.indicator_id INTO v_existing_id
-        FROM climateindicator ci
-        JOIN historicalaggregation ha
-             ON ci.agg_id = ha.agg_id
-        WHERE ha.measurement_type_id = v_rec.measurement_type_id
-        LIMIT 1;
+-- CREATE OR REPLACE PROCEDURE refresh_climate_indicators()
+-- LANGUAGE plpgsql
+-- AS $$
+-- DECLARE
+--     v_rec           RECORD;
+--     v_existing_id   INTEGER;
+--     v_count         INTEGER := 0;
+-- BEGIN
+--     FOR v_rec IN
+--         SELECT
+--             ha.measurement_type_id,
+--             mt.type_name,
+--             ROUND(AVG(ha.avg_value)::numeric, 4)  AS overall_avg,
+--             (SELECT agg_id
+--              FROM historicalaggregation ha2
+--              WHERE ha2.measurement_type_id = ha.measurement_type_id
+--              ORDER BY lower(ha2.timestamp_range) DESC
+--              LIMIT 1)                              AS latest_agg_id
+--         FROM historicalaggregation ha
+--         JOIN measurementtype mt ON ha.measurement_type_id = mt.measurement_type_id
+--         GROUP BY ha.measurement_type_id, mt.type_name
+--     LOOP
+--         SELECT ci.indicator_id INTO v_existing_id
+--         FROM climateindicator ci
+--         JOIN historicalaggregation ha
+--              ON ci.agg_id = ha.agg_id
+--         WHERE ha.measurement_type_id = v_rec.measurement_type_id
+--         LIMIT 1;
 
-        IF v_existing_id IS NOT NULL THEN
-            UPDATE climateindicator
-            SET value  = v_rec.overall_avg,
-                period = 'All-time',
-                name   = v_rec.type_name || ' — All-time Average'
-            WHERE indicator_id = v_existing_id;
-        ELSE
-            INSERT INTO climateindicator (name, value, period, agg_id)
-            VALUES (
-                v_rec.type_name || ' — All-time Average',
-                v_rec.overall_avg,
-                'All-time',
-                v_rec.latest_agg_id
-            );
-        END IF;
+--         IF v_existing_id IS NOT NULL THEN
+--             UPDATE climateindicator
+--             SET value  = v_rec.overall_avg,
+--                 period = 'All-time',
+--                 name   = v_rec.type_name || ' — All-time Average'
+--             WHERE indicator_id = v_existing_id;
+--         ELSE
+--             INSERT INTO climateindicator (name, value, period, agg_id)
+--             VALUES (
+--                 v_rec.type_name || ' — All-time Average',
+--                 v_rec.overall_avg,
+--                 'All-time',
+--                 v_rec.latest_agg_id
+--             );
+--         END IF;
 
-        v_count := v_count + 1;
-    END LOOP;
+--         v_count := v_count + 1;
+--     END LOOP;
 
-    RAISE NOTICE '[refresh_climate_indicators] Upserted % climate indicator(s).', v_count;
-END;
-$$;
+--     RAISE NOTICE '[refresh_climate_indicators] Upserted % climate indicator(s).', v_count;
+-- END;
+-- $$;
 
 
 -- =============================================================================
@@ -338,40 +359,40 @@ $$;
 --   COMMIT;
 -- =============================================================================
 
-CREATE OR REPLACE PROCEDURE get_top_polluted_locations(
-    IN  p_limit        INTEGER  DEFAULT 10,
-    IN  p_type         TEXT     DEFAULT 'PM2.5',
-    IN  p_interval     INTERVAL DEFAULT INTERVAL '7 days',
-    OUT result_cursor  REFCURSOR
-)
-LANGUAGE plpgsql
-AS $$
-BEGIN
-    OPEN result_cursor FOR
-    SELECT
-        ROW_NUMBER() OVER (ORDER BY ROUND(AVG(r.value)::numeric, 2) DESC)::BIGINT AS rank,
-        l.location_id::INTEGER,
-        l.name::TEXT                              AS location_name,
-        l.region::TEXT,
-        ROUND(AVG(r.value)::numeric, 2)           AS avg_value,
-        ROUND(MAX(r.value)::numeric, 2)           AS max_value,
-        COUNT(*)::BIGINT                          AS reading_count,
-        MAX(mu.symbol)::TEXT                      AS unit_symbol,
-        ST_Y(l.coordinates::geometry)::FLOAT8    AS latitude,
-        ST_X(l.coordinates::geometry)::FLOAT8    AS longitude
-    FROM reading          r
-    JOIN sensor           s  ON r.sensor_id           = s.sensor_id
-    JOIN location         l  ON s.location_id         = l.location_id
-    JOIN measurementtype  mt ON r.measurement_type_id = mt.measurement_type_id
-    JOIN measurementunit  mu ON r.unit_id             = mu.unit_id
-    WHERE mt.type_name  = p_type
-      AND r.timestamp  >= NOW() - p_interval
-      AND l.coordinates IS NOT NULL
-    GROUP BY l.location_id, l.name, l.region, l.coordinates
-    ORDER BY avg_value DESC
-    LIMIT p_limit;
-END;
-$$;
+-- CREATE OR REPLACE PROCEDURE get_top_polluted_locations(
+--     IN  p_limit        INTEGER  DEFAULT 10,
+--     IN  p_type         TEXT     DEFAULT 'PM2.5',
+--     IN  p_interval     INTERVAL DEFAULT INTERVAL '7 days',
+--     OUT result_cursor  REFCURSOR
+-- )
+-- LANGUAGE plpgsql
+-- AS $$
+-- BEGIN
+--     OPEN result_cursor FOR
+--     SELECT
+--         ROW_NUMBER() OVER (ORDER BY ROUND(AVG(r.value)::numeric, 2) DESC)::BIGINT AS rank,
+--         l.location_id::INTEGER,
+--         l.name::TEXT                              AS location_name,
+--         l.region::TEXT,
+--         ROUND(AVG(r.value)::numeric, 2)           AS avg_value,
+--         ROUND(MAX(r.value)::numeric, 2)           AS max_value,
+--         COUNT(*)::BIGINT                          AS reading_count,
+--         MAX(mu.symbol)::TEXT                      AS unit_symbol,
+--         ST_Y(l.coordinates::geometry)::FLOAT8    AS latitude,
+--         ST_X(l.coordinates::geometry)::FLOAT8    AS longitude
+--     FROM reading          r
+--     JOIN sensor           s  ON r.sensor_id           = s.sensor_id
+--     JOIN location         l  ON s.location_id         = l.location_id
+--     JOIN measurementtype  mt ON r.measurement_type_id = mt.measurement_type_id
+--     JOIN measurementunit  mu ON r.unit_id             = mu.unit_id
+--     WHERE mt.type_name  = p_type
+--       AND r.timestamp  >= NOW() - p_interval
+--       AND l.coordinates IS NOT NULL
+--     GROUP BY l.location_id, l.name, l.region, l.coordinates
+--     ORDER BY avg_value DESC
+--     LIMIT p_limit;
+-- END;
+-- $$;
 
 
 -- =============================================================================
@@ -385,26 +406,7 @@ $$;
 --   CALL delete_sensor(45);
 -- =============================================================================
 
-CREATE OR REPLACE PROCEDURE delete_sensor(
-    IN p_sensor_id INTEGER
-)
-LANGUAGE plpgsql
-AS $$
-BEGIN
-    -- 1. Delete associated alerts (via reading_id)
-    DELETE FROM alert WHERE reading_id IN (
-        SELECT reading_id FROM reading WHERE sensor_id = p_sensor_id
-    );
 
-    -- 2. Delete associated readings
-    DELETE FROM reading WHERE sensor_id = p_sensor_id;
-
-    -- 3. Delete the sensor itself
-    DELETE FROM sensor WHERE sensor_id = p_sensor_id;
-    
-    RAISE NOTICE 'Deleted sensor % and its associated readings/alerts', p_sensor_id;
-END;
-$$;
 
 
 -- =============================================================================
