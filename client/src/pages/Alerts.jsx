@@ -28,7 +28,10 @@ function SectionError({ message, onRetry }) {
 // Classify an alert into a high-level category for display/filtering
 function classifyAlert(alert) {
   const m = (alert.measurement || alert.alert_type || '').toLowerCase();
-  if (m.includes('pm') || m.includes('aqi') || m.includes('no2') || m.includes('so2') || m.includes('co') || m.includes('o3') || m.includes('air')) {
+  if (m.includes('pm')) {
+    return 'PM';
+  }
+  if (m.includes('aqi') || m.includes('no2') || m.includes('so2') || m.includes('co') || m.includes('o3') || m.includes('air')) {
     return 'Air Quality';
   }
   if (m.includes('temp') || m.includes('heat') || m.includes('feels')) {
@@ -49,6 +52,7 @@ function classifyAlert(alert) {
 const SEVERITY_FILTERS = ['All', 'Critical', 'High', 'Moderate'];
 const CATEGORY_ICONS = {
   'Air Quality':      Activity,
+  'PM':               Activity,
   'Temperature':      Thermometer,
   'Wind & Pressure':  Wind,
   'Precipitation':    Droplets,
@@ -60,11 +64,24 @@ export default function Alerts() {
   const [severityFilter, setSeverityFilter] = useState('All');
   const [categoryFilter, setCategoryFilter] = useState('All');
 
-  // Build unique categories from actual alerts
+  // Build unique categories from actual alerts alongside base categories
   const categories = (() => {
-    if (!alerts?.length) return [];
-    const cats = new Set(alerts.map(classifyAlert));
-    return ['All', ...Array.from(cats).sort()];
+    const baseCategories = ['All', 'Precipitation', 'Wind & Pressure', 'Temperature', 'PM'];
+    const cats = new Set(baseCategories);
+    if (alerts?.length) {
+      alerts.forEach(a => cats.add(classifyAlert(a)));
+    }
+    
+    return Array.from(cats).sort((a, b) => {
+      if (a === 'All') return -1;
+      if (b === 'All') return 1;
+      const indexA = baseCategories.indexOf(a);
+      const indexB = baseCategories.indexOf(b);
+      if (indexA !== -1 && indexB !== -1) return indexA - indexB;
+      if (indexA !== -1) return -1;
+      if (indexB !== -1) return 1;
+      return a.localeCompare(b);
+    });
   })();
 
   const filtered = (alerts || []).filter(a => {
@@ -76,8 +93,9 @@ export default function Alerts() {
     return sevMatch && catMatch;
   });
 
-  // Count per severity for badges
+  // Count per severity for badges based on current category filter
   const countBySeverity = (alerts || []).reduce((acc, a) => {
+    if (categoryFilter !== 'All' && classifyAlert(a) !== categoryFilter) return acc;
     const sev = (a.severity || 'safe').toLowerCase();
     const key = sev.charAt(0).toUpperCase() + sev.slice(1);
     acc[key] = (acc[key] || 0) + 1;
@@ -117,7 +135,9 @@ export default function Alerts() {
           <div className="flex bg-surface-secondary p-1 rounded-md border border-border-subtle">
             {SEVERITY_FILTERS.map(level => {
               const isActive = severityFilter === level;
-              const count = level === 'All' ? (alerts || []).length : (countBySeverity[level] || 0);
+              const count = level === 'All' 
+                ? (alerts || []).filter(a => categoryFilter === 'All' || classifyAlert(a) === categoryFilter).length
+                : (countBySeverity[level] || 0);
               return (
                 <button
                   key={level}
@@ -148,9 +168,11 @@ export default function Alerts() {
             {categories.map(cat => {
               const Icon = CATEGORY_ICONS[cat];
               const isActive = categoryFilter === cat;
-              const count = cat === 'All'
-                ? (alerts || []).length
-                : (alerts || []).filter(a => classifyAlert(a) === cat).length;
+              const count = (alerts || []).filter(a => {
+                const catMatch = cat === 'All' || classifyAlert(a) === cat;
+                const sevMatch = severityFilter === 'All' || (a.severity || a.alert_type || '').toLowerCase() === severityFilter.toLowerCase();
+                return catMatch && sevMatch;
+              }).length;
               return (
                 <button
                   key={cat}

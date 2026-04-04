@@ -184,17 +184,17 @@ async function runAllDataFetches(source) {
         ]);
 
         const summary = {
-            open_meteo:      meteoResult.status  === 'fulfilled' ? meteoResult.value  : { status: 'error' },
-            open_weather_map: owmResult.status   === 'fulfilled' ? owmResult.value    : { status: 'error' },
-            openaq:          aqResult.status     === 'fulfilled' ? aqResult.value     : { status: 'error' },
-            iqair:           iqairResult.status  === 'fulfilled' ? iqairResult.value  : { status: 'error' },
+            open_meteo: meteoResult.status === 'fulfilled' ? meteoResult.value : { status: 'error' },
+            open_weather_map: owmResult.status === 'fulfilled' ? owmResult.value : { status: 'error' },
+            openaq: aqResult.status === 'fulfilled' ? aqResult.value : { status: 'error' },
+            iqair: iqairResult.status === 'fulfilled' ? iqairResult.value : { status: 'error' },
         };
 
         const totalInserted =
-            (summary.open_meteo.count      || 0) +
+            (summary.open_meteo.count || 0) +
             (summary.open_weather_map.count || 0) +
-            (summary.openaq.count          || 0) +
-            (summary.iqair.count           || 0);
+            (summary.openaq.count || 0) +
+            (summary.iqair.count || 0);
 
         console.log(`[Cron] Sync complete. Total new readings: ${totalInserted}`);
 
@@ -240,6 +240,6 @@ server.listen(PORT, () => {
     console.log(`\n✅  AtmoInsight Server running on port ${PORT}`);
     console.log(`   Open-Meteo sync:       every 30 min (free, no key needed)`);
     console.log(`   OpenWeatherMap sync:   every 30 min (${process.env.OPENWEATHER_API_KEY ? '✅ key found' : '⚠️  key missing — add OPENWEATHER_API_KEY to .env'})`);
-    console.log(`   OpenAQ sync:           every 60 min (${process.env.OPENAQ_API_KEY        ? '✅ key found' : '⚠️  key missing — add OPENAQ_API_KEY to .env'})`);
-    console.log(`   IQAir sync:            every 30 min (${process.env.IQAIR_API_KEY          ? '✅ key found' : '⚠️  key missing — add IQAIR_API_KEY to .env'})\n`);
+    console.log(`   OpenAQ sync:           every 60 min (${process.env.OPENAQ_API_KEY ? '✅ key found' : '⚠️  key missing — add OPENAQ_API_KEY to .env'})`);
+    console.log(`   IQAir sync:            every 30 min (${process.env.IQAIR_API_KEY ? '✅ key found' : '⚠️  key missing — add IQAIR_API_KEY to .env'})\n`);
 });

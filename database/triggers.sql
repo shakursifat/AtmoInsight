@@ -142,7 +142,7 @@ BEGIN
     PERFORM pg_notify('new_alert_channel', NEW.reading_id::text);
 
     -- -------------------------------------------------------------------------
-    -- Critical → classified disaster (merge within 12h at same location + type)
+    -- Critical → classified disaster (merge within 48h at same location + type)
     -- -------------------------------------------------------------------------
     IF v_severity <> 'Critical' THEN
         RETURN NEW;
@@ -167,98 +167,103 @@ BEGIN
         RETURN NEW;
     END IF;
 
-    SELECT EXISTS (
-        SELECT 1
-        FROM disastertype dt
-        WHERE dt.type_id = v_disaster_type_id
-          AND dt.subgroup_id = (
-              SELECT subgroup_id FROM disastersubgroup
-              WHERE subgroup_name = 'Meteorological'
-          )
-    ) INTO v_is_meteo_subgroup;
+    DECLARE
+        v_dt_name TEXT;
+    BEGIN
+        SELECT type_name INTO v_dt_name FROM disastertype WHERE type_id = v_disaster_type_id;
 
-    IF v_mt_name ILIKE '%wind%' THEN
-        v_wind := NEW.value;
-    ELSIF v_mt_name ILIKE '%pressure%' THEN
-        v_pressure := NEW.value;
-    ELSIF v_mt_name ILIKE '%precip%' OR v_mt_name ILIKE '%rain%' THEN
-        v_precip := NEW.value;
-    END IF;
+        SELECT EXISTS (
+            SELECT 1 FROM disastertype dt
+            WHERE dt.type_id = v_disaster_type_id
+              AND dt.subgroup_id = (
+                  SELECT subgroup_id FROM disastersubgroup
+                  WHERE subgroup_name = 'Meteorological'
+              )
+        ) INTO v_is_meteo_subgroup;
 
-    SELECT de.event_id INTO v_existing_event_id
-    FROM disasterevent de
-    WHERE de.disaster_type_id = v_disaster_type_id
-      AND de.location_id = v_location_id
-      AND (
-            de.start_timestamp >= NOW() - INTERVAL '12 hours'
-         OR COALESCE(de.end_timestamp, de.start_timestamp) >= NOW() - INTERVAL '12 hours'
-          )
-    ORDER BY de.start_timestamp DESC
-    LIMIT 1;
+        IF v_mt_name ILIKE '%wind%' THEN
+            v_wind := NEW.value;
+        ELSIF v_mt_name ILIKE '%pressure%' THEN
+            v_pressure := NEW.value;
+        ELSIF v_mt_name ILIKE '%precip%' OR v_mt_name ILIKE '%rain%' THEN
+            v_precip := NEW.value;
+        END IF;
 
-    IF v_existing_event_id IS NOT NULL THEN
-        UPDATE disasterevent
-        SET end_timestamp = NOW(),
-            severity = 'EXTREME',
-            description = FORMAT(
-                'Ongoing event (updated): sensor %s critical reading %s at %s.',
-                NEW.sensor_id, NEW.value, NOW()
+        SELECT de.event_id INTO v_existing_event_id
+        FROM disasterevent de
+        WHERE de.disaster_type_id = v_disaster_type_id
+          AND de.location_id = v_location_id
+          AND (
+                de.start_timestamp >= NOW() - INTERVAL '48 hours'
+             OR COALESCE(de.end_timestamp, de.start_timestamp) >= NOW() - INTERVAL '48 hours'
+              )
+        ORDER BY de.start_timestamp DESC
+        LIMIT 1;
+
+        IF v_existing_event_id IS NOT NULL THEN
+            UPDATE disasterevent
+            SET end_timestamp = NOW(),
+                severity = 'EXTREME',
+                description = FORMAT(
+                    'Ongoing %s (updated): %s reached critical level %s %s at %s.',
+                    v_dt_name, v_mt_name, NEW.value, COALESCE(v_unit_sym, ''), COALESCE(v_loc_name, 'Unknown location')
+                )
+            WHERE event_id = v_existing_event_id;
+
+            IF v_is_meteo_subgroup THEN
+                IF EXISTS (SELECT 1 FROM meteorologicalevent WHERE event_id = v_existing_event_id) THEN
+                    UPDATE meteorologicalevent
+                    SET wind_speed = CASE
+                            WHEN v_wind IS NOT NULL THEN GREATEST(COALESCE(wind_speed, v_wind), v_wind)
+                            ELSE wind_speed
+                        END,
+                        pressure = CASE
+                            WHEN v_pressure IS NOT NULL THEN LEAST(COALESCE(pressure, v_pressure), v_pressure)
+                            ELSE pressure
+                        END,
+                        precipitation = CASE
+                            WHEN v_precip IS NOT NULL THEN GREATEST(COALESCE(precipitation, v_precip), v_precip)
+                            ELSE precipitation
+                        END
+                    WHERE event_id = v_existing_event_id;
+                ELSE
+                    INSERT INTO meteorologicalevent (event_id, wind_speed, pressure, precipitation, description)
+                    VALUES (
+                        v_existing_event_id,
+                        v_wind, v_pressure, v_precip,
+                        FORMAT('Meteorological detail for ongoing %s.', v_dt_name)
+                    );
+                END IF;
+            END IF;
+
+            PERFORM pg_notify('new_disaster_channel', v_existing_event_id::text);
+        ELSE
+            INSERT INTO disasterevent (
+                disaster_type_id, start_timestamp, end_timestamp, severity, description, location_id
             )
-        WHERE event_id = v_existing_event_id;
+            VALUES (
+                v_disaster_type_id,
+                NOW(),
+                NOW(),
+                'EXTREME',
+                FORMAT('Critical Alert triggered %s: %s crossed critical threshold (%s %s) at %s.',
+                       v_dt_name, v_mt_name, NEW.value, COALESCE(v_unit_sym, ''), COALESCE(v_loc_name, 'Unknown location')),
+                v_location_id
+            )
+            RETURNING event_id INTO v_event_id;
 
-        IF v_is_meteo_subgroup THEN
-            IF EXISTS (SELECT 1 FROM meteorologicalevent WHERE event_id = v_existing_event_id) THEN
-                UPDATE meteorologicalevent
-                SET wind_speed = CASE
-                        WHEN v_wind IS NOT NULL THEN GREATEST(COALESCE(wind_speed, v_wind), v_wind)
-                        ELSE wind_speed
-                    END,
-                    pressure = CASE
-                        WHEN v_pressure IS NOT NULL THEN LEAST(COALESCE(pressure, v_pressure), v_pressure)
-                        ELSE pressure
-                    END,
-                    precipitation = CASE
-                        WHEN v_precip IS NOT NULL THEN GREATEST(COALESCE(precipitation, v_precip), v_precip)
-                        ELSE precipitation
-                    END
-                WHERE event_id = v_existing_event_id;
-            ELSE
+            IF v_is_meteo_subgroup THEN
                 INSERT INTO meteorologicalevent (event_id, wind_speed, pressure, precipitation, description)
                 VALUES (
-                    v_existing_event_id,
+                    v_event_id,
                     v_wind, v_pressure, v_precip,
-                    'Auto-generated meteorological detail for ongoing event.'
+                    FORMAT('Meteorological detail for %s.', v_dt_name)
                 );
             END IF;
+
+            PERFORM pg_notify('new_disaster_channel', v_event_id::text);
         END IF;
-
-        PERFORM pg_notify('new_disaster_channel', v_existing_event_id::text);
-    ELSE
-        INSERT INTO disasterevent (
-            disaster_type_id, start_timestamp, end_timestamp, severity, description, location_id
-        )
-        VALUES (
-            v_disaster_type_id,
-            NOW(),
-            NOW(),
-            'EXTREME',
-            FORMAT('Auto-generated disaster event: sensor %s exceeded critical threshold (%s).',
-                   NEW.sensor_id, NEW.value),
-            v_location_id
-        )
-        RETURNING event_id INTO v_event_id;
-
-        IF v_is_meteo_subgroup THEN
-            INSERT INTO meteorologicalevent (event_id, wind_speed, pressure, precipitation, description)
-            VALUES (
-                v_event_id,
-                v_wind, v_pressure, v_precip,
-                'Auto-generated meteorological detail.'
-            );
-        END IF;
-
-        PERFORM pg_notify('new_disaster_channel', v_event_id::text);
-    END IF;
+    END;
 
     RETURN NEW;
 END;
