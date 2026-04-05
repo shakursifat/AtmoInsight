@@ -162,11 +162,23 @@ INSERT INTO reading (sensor_id, timestamp, value, measurement_type_id, unit_id, 
 -- 9. AlertType (no dependencies)
 -- =============================================================================
 INSERT INTO alerttype (type_name, description) VALUES
-  ('High PM2.5',       'Fine particulate matter concentration exceeds safe WHO limit of 75 µg/m³'),
-  ('Flood Risk',       'River water level approaches or exceeds danger mark'),
-  ('High Wind',        'Wind speed exceeds gale-force threshold at coastal stations'),
-  ('Extreme Heat',     'Temperature exceeds 40 °C — heat stress alert'),
-  ('Critical PM2.5',   'PM2.5 exceeds 150 µg/m³ — immediate health hazard');
+  ('High PM2.5',        'Fine particulate matter concentration exceeds safe WHO limit of 75 µg/m³'),
+  ('Flood Risk',        'River water level approaches or exceeds danger mark'),
+  ('High Wind',         'Wind speed exceeds gale-force threshold at coastal stations'),
+  ('Extreme Heat',      'Temperature exceeds 40 °C — heat stress alert'),
+  ('Critical PM2.5',   'PM2.5 exceeds 150 µg/m³ — immediate health hazard'),
+  ('Temperature Alert', 'Temperature exceeds or falls below configured threshold'),
+  ('Humidity Alert',    'Relative humidity exceeds or falls below configured threshold'),
+  ('Pressure Alert',    'Atmospheric pressure outside safe range'),
+  ('UV Index Alert',    'UV Index exceeds high or extreme level'),
+  ('PM10 Alert',        'Coarse particulate matter PM10 exceeds threshold'),
+  ('AQI Alert',         'Air Quality Index exceeds configured threshold'),
+  ('NO2 Alert',         'Nitrogen dioxide concentration exceeds safe level'),
+  ('O3 Alert',          'Ozone concentration exceeds safe level'),
+  ('CO Alert',          'Carbon monoxide concentration exceeds safe level'),
+  ('SO2 Alert',         'Sulfur dioxide concentration exceeds safe level'),
+  ('Dew Point Alert',   'Dew point temperature indicates oppressive humidity'),
+  ('Water Level Alert', 'Water level exceeds danger mark');
 
 -- =============================================================================
 -- 10. AlertThreshold (depends on: MeasurementType, MeasurementUnit)

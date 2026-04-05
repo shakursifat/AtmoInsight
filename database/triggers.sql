@@ -57,12 +57,33 @@ BEGIN
         RETURN NEW;
     END IF;
 
-    SELECT COALESCE(
-        (SELECT alert_type_id FROM alerttype
-         WHERE type_name ILIKE '%' || v_mt_name || '%'
-         LIMIT 1),
-        1
-    ) INTO v_alert_type;
+    -- -------------------------------------------------------------------------
+    -- Map measurement type → alert type with explicit priority:
+    --   1. Starts-with match  e.g. 'Temperature%' → 'Temperature Alert'
+    --   2. Contains match     e.g. '%Wind%'        → 'High Wind'
+    --   3. Auto-create a new alert type (never fall back to alert_type_id = 1)
+    -- -------------------------------------------------------------------------
+    SELECT alert_type_id INTO v_alert_type
+    FROM alerttype
+    WHERE type_name ILIKE v_mt_name || '%'
+    ORDER BY length(type_name) ASC
+    LIMIT 1;
+
+    IF v_alert_type IS NULL THEN
+        SELECT alert_type_id INTO v_alert_type
+        FROM alerttype
+        WHERE type_name ILIKE '%' || v_mt_name || '%'
+        ORDER BY length(type_name) ASC
+        LIMIT 1;
+    END IF;
+
+    -- If still no match, create a dedicated alert type on the fly
+    IF v_alert_type IS NULL THEN
+        INSERT INTO alerttype (type_name, description)
+        VALUES (v_mt_name || ' Alert', 'Auto-created alert type for ' || v_mt_name)
+        RETURNING alert_type_id INTO v_alert_type;
+    END IF;
+
 
     -- Any threshold row breached for this measurement + unit combination?
     -- unit_id IS NULL rows act as wildcards and match any unit.
