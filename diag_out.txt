@@ -1,0 +1,39 @@
+﻿ALERT THRESHOLDS:
+{"threshold_id":1,"measurement_type_id":1,"type_name":"PM2.5","min_value":null,"max_value":"30.0","severity":"Moderate"}
+{"threshold_id":2,"measurement_type_id":1,"type_name":"PM2.5","min_value":null,"max_value":"150.0","severity":"High"}
+{"threshold_id":3,"measurement_type_id":3,"type_name":"Temperature","min_value":null,"max_value":"20.0","severity":"High"}
+{"threshold_id":4,"measurement_type_id":5,"type_name":"Water Level","min_value":"5.0","max_value":"30.0","severity":"High"}
+{"threshold_id":5,"measurement_type_id":6,"type_name":"Wind Speed","min_value":null,"max_value":"5.0","severity":"Moderate"}
+
+MEASUREMENT TYPES:
+{"measurement_type_id":1,"type_name":"PM2.5"}
+{"measurement_type_id":2,"type_name":"PM10"}
+{"measurement_type_id":3,"type_name":"Temperature"}
+{"measurement_type_id":4,"type_name":"Humidity"}
+{"measurement_type_id":5,"type_name":"Water Level"}
+{"measurement_type_id":6,"type_name":"Wind Speed"}
+{"measurement_type_id":7,"type_name":"UV Index"}
+{"measurement_type_id":8,"type_name":"Pressure"}
+{"measurement_type_id":9,"type_name":"NO2"}
+{"measurement_type_id":10,"type_name":"AQI"}
+{"measurement_type_id":11,"type_name":"Dew Point"}
+{"measurement_type_id":12,"type_name":"CO"}
+{"measurement_type_id":13,"type_name":"O3"}
+{"measurement_type_id":14,"type_name":"SO2"}
+
+LAST 5 TEMPERATURE READINGS:
+{"reading_id":40767,"value":"30","timestamp":"2026-04-05T03:40:10.221Z","type_name":"Temperature","measurement_type_id":3,"sensor_name":"IQAir-PALTAN","source":"IQAir AirVisual"}
+{"reading_id":40758,"value":"30","timestamp":"2026-04-05T03:40:09.843Z","type_name":"Temperature","measurement_type_id":3,"sensor_name":"IQAir-DHAKA","source":"IQAir AirVisual"}
+{"reading_id":40753,"value":"30","timestamp":"2026-04-05T03:40:09.660Z","type_name":"Temperature","measurement_type_id":3,"sensor_name":"IQAir-AZIMPUR","source":"IQAir AirVisual"}
+{"reading_id":40748,"value":"30","timestamp":"2026-04-05T03:40:09.469Z","type_name":"Temperature","measurement_type_id":3,"sensor_name":"IQAir-COX'S-BAZAR","source":"IQAir AirVisual"}
+{"reading_id":40673,"value":"30","timestamp":"2026-04-05T03:33:14.369Z","type_name":"Temperature","measurement_type_id":3,"sensor_name":"IQAir-PALTAN","source":"IQAir AirVisual"}
+
+RECENT ALERTS:
+{"alert_id":10300,"severity":"High","message":"In Paltan, Dhaka this Temperature crossed the max limit 20.0 ┬░C","timestamp":"2026-04-05T03:40:05.460Z"}
+{"alert_id":10298,"severity":"High","message":"In Dhaka, Dhaka this Temperature crossed the max limit 20.0 ┬░C","timestamp":"2026-04-05T03:40:05.081Z"}
+{"alert_id":10297,"severity":"High","message":"In Azimpur, Dhaka this Temperature crossed the max limit 20.0 ┬░C","timestamp":"2026-04-05T03:40:04.899Z"}
+{"alert_id":10296,"severity":"High","message":"In Cox's Bazar, Chittagong this Temperature crossed the max limit 20.0 ┬░C","timestamp":"2026-04-05T03:40:04.708Z"}
+{"alert_id":10267,"severity":"High","message":"In Paltan, Dhaka this Temperature crossed the max limit 20.0 ┬░C","timestamp":"2026-04-05T03:33:09.908Z"}
+
+TRIGGERS:
+{"tgname":"trg_alert_on_threshold","tgenabled":"O"}

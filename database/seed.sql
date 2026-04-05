@@ -169,14 +169,79 @@ INSERT INTO alerttype (type_name, description) VALUES
   ('Critical PM2.5',   'PM2.5 exceeds 150 µg/m³ — immediate health hazard');
 
 -- =============================================================================
--- 10. AlertThreshold (depends on: MeasurementType)
+-- 10. AlertThreshold (depends on: MeasurementType, MeasurementUnit)
+--     Calibrated to Bangladesh / IQAir real-world values so alerts fire
+--     readily in demos. IQAir typically reports AQI ~130-155, Temp ~28-32°C.
+--
+--     unit_id reference (from MeasurementUnit seed):
+--       1 = µg/m³   (Micrograms per cubic metre)
+--       2 = °C       (Degrees Celsius)
+--       3 = %        (Percentage)
+--       4 = m        (Metres)
+--       5 = m/s      (Metres per second)
+--       6 = -        (Dimensionless — UV Index, AQI)
+--       7 = hPa      (Hectopascal)
+--     NULL = wildcard — applies to all units for this measurement type
 -- =============================================================================
-INSERT INTO alertthreshold (measurement_type_id, min_value, max_value, severity) VALUES
-  (1, NULL,  75.0, 'Moderate'),   -- PM2.5 WHO guideline
-  (1, NULL, 150.0, 'High'),       -- PM2.5 hazardous
-  (3, NULL,  40.0, 'High'),       -- Temperature extreme
-  (5,  5.0,  NULL, 'High'),       -- Water level danger mark (metres)
-  (6, NULL,  28.0, 'Moderate');   -- Wind speed gale threshold
+INSERT INTO alertthreshold (measurement_type_id, unit_id, min_value, max_value, severity) VALUES
+  -- PM2.5 (µg/m³, unit_id=1) — WHO 24h guideline 15; below real IQAir values
+  (1,  1,   NULL,  25.0,  'Moderate'),   -- WHO daily guideline — frequently exceeded
+  (1,  1,   NULL, 100.0,  'High'),       -- Unhealthy level
+
+  -- AQI (dimensionless, unit_id=6) — IQAir Bangladesh ~130-155
+  (10, 6,   NULL, 100.0,  'Moderate'),   -- Moderate AQI
+  (10, 6,   NULL, 150.0,  'High'),       -- Unhealthy AQI
+
+  -- Temperature (°C, unit_id=2) — Bangladesh averages ~28-32°C
+  -- unit-specific: a °F reading of 80°F (=26.7°C) will NOT falsely trigger
+  (3,  2,   NULL,  27.0,  'Moderate'),   -- Warm — fires on most IQAir readings
+  (3,  2,   NULL,  35.0,  'High'),       -- Heat stress threshold
+  (3,  2,   10.0,  NULL,  'Low'),        -- Cold alert (winter minimum)
+
+  -- Humidity (%, unit_id=3) — Bangladesh typically 50-70%
+  (4,  3,   NULL,  80.0,  'Moderate'),   -- High humidity discomfort
+  (4,  3,   20.0,  NULL,  'Low'),        -- Very dry condition alert
+
+  -- Wind Speed (m/s, unit_id=5)
+  (6,  5,   NULL,   8.0,  'Moderate'),   -- Strong breeze
+  (6,  5,   NULL,  20.0,  'High'),       -- Gale-force
+
+  -- Pressure (hPa, unit_id=7) — normal range 1005-1015
+  (8,  7,  990.0,  NULL,  'High'),       -- Low pressure / storm risk
+  (8,  7,   NULL, 1025.0, 'Low'),        -- High pressure stagnation
+
+  -- Water Level (m, unit_id=4) — flood danger mark
+  (5,  4,    5.0,  NULL,  'High'),       -- Flood danger mark
+
+  -- UV Index (dimensionless, unit_id=6)
+  (7,  6,   NULL,   6.0,  'Moderate'),   -- High UV
+  (7,  6,   NULL,  11.0,  'High'),       -- Extreme UV
+
+  -- PM10 (µg/m³, unit_id=1)
+  (2,  1,   NULL,  50.0,  'Moderate'),   -- WHO 24h guideline
+  (2,  1,   NULL, 150.0,  'High'),       -- Very poor air quality
+
+  -- NO2, O3, CO, SO2, Dew Point — unit may vary by API source; use NULL wildcard
+  -- NO2 (µg/m³ typically)
+  (9,  NULL, NULL,  40.0,  'Moderate'),  -- WHO annual guideline
+  (9,  NULL, NULL, 200.0,  'High'),      -- Hourly alert level
+
+  -- O3 / Ozone
+  (13, NULL, NULL, 100.0,  'Moderate'),
+  (13, NULL, NULL, 180.0,  'High'),
+
+  -- CO / Carbon Monoxide
+  (12, NULL, NULL,   4.0,  'Moderate'),
+  (12, NULL, NULL,  10.0,  'High'),
+
+  -- SO2
+  (14, NULL, NULL,  20.0,  'Moderate'),
+  (14, NULL, NULL, 500.0,  'High'),
+
+  -- Dew Point (°C, unit_id=2)
+  (11, 2,    NULL,  24.0,  'Moderate'),  -- Uncomfortable humidity index
+  (11, 2,    NULL,  28.0,  'High');      -- Very oppressive
+
 
 -- =============================================================================
 -- 11. Alert (depends on: Reading, AlertType)

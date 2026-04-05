@@ -74,6 +74,7 @@ CREATE TABLE AlertType (
 CREATE TABLE AlertThreshold (
     threshold_id SERIAL PRIMARY KEY,
     measurement_type_id INTEGER REFERENCES MeasurementType(measurement_type_id),
+    unit_id INTEGER REFERENCES MeasurementUnit(unit_id),  -- NULL = applies to all units (wildcard)
     min_value NUMERIC,
     max_value NUMERIC,
     severity VARCHAR(20)

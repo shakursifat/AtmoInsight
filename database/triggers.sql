@@ -41,6 +41,22 @@ BEGIN
     FROM measurementtype
     WHERE measurement_type_id = NEW.measurement_type_id;
 
+    -- If no measurement type found, nothing to do
+    IF v_mt_name IS NULL THEN
+        RETURN NEW;
+    END IF;
+
+    -- Check if ANY threshold is configured for this measurement type
+    -- (unit-aware: unit_id IS NULL means 'applies to all units').
+    -- If nothing matches, skip silently — do NOT touch any alerts.
+    IF NOT EXISTS (
+        SELECT 1 FROM alertthreshold
+        WHERE measurement_type_id = NEW.measurement_type_id
+          AND (unit_id IS NULL OR unit_id = NEW.unit_id)
+    ) THEN
+        RETURN NEW;
+    END IF;
+
     SELECT COALESCE(
         (SELECT alert_type_id FROM alerttype
          WHERE type_name ILIKE '%' || v_mt_name || '%'
@@ -48,10 +64,12 @@ BEGIN
         1
     ) INTO v_alert_type;
 
-    -- Any threshold row breached for this measurement?
+    -- Any threshold row breached for this measurement + unit combination?
+    -- unit_id IS NULL rows act as wildcards and match any unit.
     v_breach := EXISTS (
         SELECT 1 FROM alertthreshold
         WHERE measurement_type_id = NEW.measurement_type_id
+          AND (unit_id IS NULL OR unit_id = NEW.unit_id)
           AND (
                 (max_value IS NOT NULL AND NEW.value > max_value)
              OR (min_value IS NOT NULL AND NEW.value < min_value)
@@ -60,6 +78,7 @@ BEGIN
 
     -- -------------------------------------------------------------------------
     -- Resolution: reading back within limits → close active alert for this pair
+    -- Only resolves alerts for THIS specific measurement type's alert_type.
     -- -------------------------------------------------------------------------
     IF NOT v_breach THEN
         UPDATE alert
@@ -71,15 +90,19 @@ BEGIN
         RETURN NEW;
     END IF;
 
-    -- Pick dominant threshold row
+    -- Pick the most specific breached threshold:
+    -- prefer an exact unit_id match over a wildcard (unit_id IS NULL).
     SELECT * INTO v_threshold
     FROM alertthreshold
     WHERE measurement_type_id = NEW.measurement_type_id
+      AND (unit_id IS NULL OR unit_id = NEW.unit_id)
       AND (
             (max_value IS NOT NULL AND NEW.value > max_value)
          OR (min_value IS NOT NULL AND NEW.value < min_value)
           )
-    ORDER BY max_value DESC NULLS LAST
+    ORDER BY
+        (unit_id IS NOT NULL) DESC,  -- exact unit match first
+        max_value DESC NULLS LAST
     LIMIT 1;
 
     IF NOT FOUND THEN
